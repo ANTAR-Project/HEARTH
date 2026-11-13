@@ -1,0 +1,60 @@
+name: antar-hearth
+
+services:
+
+  # streaming-service
+  streaming-service:
+    build:
+      context: .
+      dockerfile: streaming-service/Dockerfile
+    container_name: streaming-service
+    env_file:
+      - ./streaming-service/.env
+    environment:
+      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
+    ports:
+      - "8084:8084"
+    depends_on:
+      auth-service:
+        condition: service_started
+    networks:
+      - hearth
+
+  # auth-service
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    env_file:
+      - ./auth-service/.env
+    environment:
+      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
+    ports:
+      - "8085:8085"
+      - "4091:4091"
+    networks:
+      - hearth
+
+  # notification-service
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    env_file:
+      - ./notification-service/.env
+    environment:
+      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
+    ports:
+      - "8087:8087"
+    depends_on:
+      auth-service:
+        condition: service_started
+    networks:
+      - hearth
+
+networks:
+  hearth:
+    name: hearth
+    driver: bridge
