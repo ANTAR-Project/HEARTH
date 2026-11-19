@@ -1,6 +1,141 @@
-name: antar-hearth
+version: '3.8'
 
 services:
+
+  # ─────────────────────────────────────────
+  # REDIS — Streaming URL Cache
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:latest
+    container_name: redis-antar
+    ports:
+      - "6379:6379"
+    volumes:
+      - hearth-redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - antar-hearth
+
+  # ─────────────────────────────────────────
+  # ZOOKEEPER — Required by Kafka
+  # ─────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - antar-hearth
+
+  # ─────────────────────────────────────────
+  # KAFKA — Event Streaming
+  # ─────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - antar-hearth
+
+  # ─────────────────────────────────────────
+  # POSTGRES — auth-service identity store
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres-antar
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD} # bootstrap-only superuser; no app connects as this role
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      STREAMING_DB_PASSWORD: ${STREAMING_DB_PASSWORD}
+    volumes:
+      - hearth-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - antar-hearth
+
+  # ─────────────────────────────────────────
+  # MICROSERVICES
+  # ─────────────────────────────────────────
+
+  # nas-orchestrator
+  nas-orchestrator:
+    build:
+      context: .
+      dockerfile: nas-orchestrator/Dockerfile
+    container_name: nas-orchestrator
+    env_file:
+      - ./nas-orchestrator/.env
+    ports:
+      - "8081:8081"
+      - "4092:4092"
+    depends_on:
+      redis:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - antar-hearth
+
+  # video-service
+  video-service:
+    build:
+      context: .
+      dockerfile: video-service/Dockerfile
+    container_name: video-service
+    env_file:
+      - ./video-service/.env
+    ports:
+      - "8082:8082"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - antar-hearth
+
+  # encoding-service
+  encoding-service:
+    build:
+      context: .
+      dockerfile: encoding-service/Dockerfile
+    container_name: encoding-service
+    env_file:
+      - ./encoding-service/.env
+    ports:
+      - "8083:8083"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - antar-hearth
 
   # streaming-service
   streaming-service:
@@ -10,15 +145,21 @@ services:
     container_name: streaming-service
     env_file:
       - ./streaming-service/.env
-    environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
     ports:
       - "8084:8084"
     depends_on:
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      nas-orchestrator:
+        condition: service_started
       auth-service:
         condition: service_started
     networks:
-      - hearth
+      - antar-hearth
 
   # auth-service
   auth-service:
@@ -28,13 +169,16 @@ services:
     container_name: auth-service
     env_file:
       - ./auth-service/.env
-    environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
     ports:
       - "8085:8085"
       - "4091:4091"
+    depends_on:
+      redis:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     networks:
-      - hearth
+      - antar-hearth
 
   # notification-service
   notification-service:
@@ -44,17 +188,20 @@ services:
     container_name: notification-service
     env_file:
       - ./notification-service/.env
-    environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
     ports:
       - "8087:8087"
     depends_on:
+      kafka:
+        condition: service_started
       auth-service:
         condition: service_started
     networks:
-      - hearth
+      - antar-hearth
 
 networks:
-  hearth:
-    name: hearth
+  antar-hearth:
     driver: bridge
+
+volumes:
+  hearth-redis-data:
+  hearth-postgres-data:
