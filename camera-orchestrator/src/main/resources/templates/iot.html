@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANTAR OS • IoT Hub & Camera</title>
+    <link rel="stylesheet" th:href="@{/css/style.css(v=110)}">
+    <!-- HLS.js for resilient adaptive streaming -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+    <!-- Top Navigation Header -->
+    <header class="navbar">
+        <a href="/iot" class="nav-brand">
+            <div class="brand-icon">⚡</div>
+            <div class="brand-text">
+                <h1>ANTAR OS</h1>
+                <span>Smart Hearth & Surveillance</span>
+            </div>
+        </a>
+        <nav class="nav-links">
+            <a href="/iot" class="nav-link active">
+                <span>📡</span> IoT Hub
+            </a>
+            <a href="/nas" class="nav-link">
+                <span>💾</span> TrueNAS Vault
+            </a>
+            <a href="/adapters" class="nav-link">
+                <span>⚙️</span> Adapters
+            </a>
+        </nav>
+        <div class="nav-status">
+            <div class="ws-badge" id="ws-status-badge">
+                <span class="ws-pulse"></span>
+                <span id="ws-status-text">Connected</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- IoT Status & Metrics Banner -->
+        <div class="status-banner">
+            <div class="status-banner-left">
+                <div class="status-avatar">📡</div>
+                <div class="status-info">
+                    <h2>IoT Core Control Matrix</h2>
+                    <p>Live physical hardware monitoring on VLAN 30 and cross-protocol gateway.</p>
+                </div>
+            </div>
+            <div class="status-banner-pills">
+                <span class="pill-badge cyan">
+                    <span>📷</span> CP PLUS E28A Online
+                </span>
+                <span class="pill-badge emerald" id="motion-pill-badge">
+                    <span id="motion-pill-icon">🟢</span> Motion Sensor: <strong id="motion-pill-status">Idle</strong>
+                </span>
+                <span class="pill-badge indigo">
+                    <span>⚡</span> Gateway Port: 8080
+                </span>
+            </div>
+        </div>
+
+        <!-- Section 1: Live Camera Surveillance & PTZ Controls -->
+        <div class="section-header">
+            <h2><span>📹</span> Front Porch Surveillance Stream</h2>
+            <span class="section-badge" id="stream-engine-badge">⚡ WebRTC WHEP (Ultra-Low Latency)</span>
+        </div>
+
+        <div class="camera-hero-card">
+            <!-- Header Bar -->
+            <div class="camera-header-bar">
+                <div class="camera-title-group">
+                    <span class="cam-dot-live"></span>
+                    <h3>CP PLUS E28A (192.168.30.247)</h3>
+                </div>
+                <div class="camera-controls-bar">
+                    <!-- Stream Engine Toggle Switch -->
+                    <div class="stream-toggle-pill">
+                        <button class="stream-toggle-btn active" id="btn-toggle-webrtc" onclick="switchStreamEngine('webrtc')">
+                            ⚡ WebRTC
+                        </button>
+                        <button class="stream-toggle-btn" id="btn-toggle-hls" onclick="switchStreamEngine('hls')">
+                            📺 HLS
+                        </button>
+                    </div>
+
+                    <!-- Snapshot Refresh Button -->
+                    <button class="btn-cam" onclick="refreshCameraSnapshot('camera.front_porch_cam')">
+                        🔄 Refresh Snapshot
+                    </button>
+
+                    <!-- Direct Snapshot View Link -->
+                    <a class="btn-cam" href="/api/camera/camera.front_porch_cam/snapshot" target="_blank">
+                        🖼️ Open Frame
+                    </a>
+                </div>
+            </div>
+
+            <!-- Video Player Stage -->
+            <div class="camera-stage">
+                <!-- WebRTC / HLS Video Element -->
+                <video id="camera-live-video" autoplay playsinline muted></video>
+
+                <!-- Snapshot Image Fallback -->
+                <img id="camera-snapshot-view" style="display: none;" alt="Camera Snapshot">
+
+                <!-- Overlay Badges -->
+                <div class="camera-stage-overlay">
+                    <div class="camera-badge-overlay" id="cam-protocol-tag">ONVIF Profile: Mainstream 1080p</div>
+                    <div class="camera-badge-overlay" id="cam-motion-tag">Motion: Idle</div>
+                </div>
+            </div>
+
+            <!-- PTZ & TrueNAS Clip Recording Footer -->
+            <div class="camera-footer-controls">
+                <!-- PTZ Pan/Tilt Controls -->
+                <div class="ptz-cluster">
+                    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-right: 0.4rem;">PTZ:</span>
+                    <button class="ptz-btn" title="Pan Left" onclick="sendPtz('PTZ_LEFT')">◀</button>
+                    <button class="ptz-btn" title="Tilt Up" onclick="sendPtz('PTZ_UP')">▲</button>
+                    <button class="ptz-btn" title="Tilt Down" onclick="sendPtz('PTZ_DOWN')">▼</button>
+                    <button class="ptz-btn" title="Pan Right" onclick="sendPtz('PTZ_RIGHT')">▶</button>
+                    <button class="ptz-btn" title="Stop Move" onclick="sendPtz('PTZ_STOP')">⏹</button>
+                </div>
+
+                <!-- TrueNAS Clip Recording Action -->
+                <div class="record-controls-cluster">
+                    <label for="clip-duration-select" style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">
+                        Clip Length:
+                    </label>
+                    <select id="clip-duration-select" class="duration-select">
+                        <option value="10">10 Seconds</option>
+                        <option value="15" selected>15 Seconds</option>
+                        <option value="30">30 Seconds</option>
+                        <option value="60">60 Seconds</option>
+                    </select>
+                    <button class="btn-cam record-btn" id="btn-record-clip" onclick="recordCameraClip('camera.front_porch_cam')">
+                        🔴 Record to TrueNAS
+                    </button>
+                    <a href="/nas" class="btn-cam" style="border-color: rgba(6, 182, 212, 0.4); color: var(--accent-primary);">
+                        📁 Open Vault
+                    </a>
+                </div>
+            </div>
+            <div id="recording-progress-bar" style="display: none; padding: 0.75rem 1.6rem; background: rgba(6, 182, 212, 0.1); border-top: 1px solid rgba(6, 182, 212, 0.3); font-size: 0.82rem; font-weight: 600; color: var(--accent-primary); text-align: center;">
+                ⏳ Capturing clip and uploading to TrueNAS SMB vault...
+            </div>
+        </div>
+
+        <!-- Section 2: Physical Hardware Devices -->
+        <div class="section-header">
+            <h2><span>🔌</span> Physical IoT Devices</h2>
+            <span class="section-badge" id="devices-count-badge">1 Active Device</span>
+        </div>
+
+        <div class="devices-grid">
+            <!-- Real Hardware Card: CP PLUS Camera -->
+            <div class="device-card" id="card-device-cpplus_front_cam">
+                <div class="device-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-size: 1.4rem;">📹</span>
+                        <div>
+                            <h3>CP Plus E28A Wi-Fi Camera</h3>
+                            <span class="device-meta-row" style="margin-bottom: 0;">
+                                IP: 192.168.30.247 • Area: Front Porch
+                            </span>
+                        </div>
+                    </div>
+                    <span class="pill-badge success">Online</span>
+                </div>
+                <div style="margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span class="device-badge-protocol">ONVIF</span>
+                        <span class="device-badge-protocol">RTSP</span>
+                        <span class="device-badge-protocol">H.264+AAC</span>
+                    </div>
+                    <span style="font-size: 0.78rem; font-weight: 600; color: var(--accent-emerald);">● Streaming Ready</span>
+                </div>
+            </div>
+
+            <!-- Auto-Discovery Active Empty State -->
+            <div class="discovery-card">
+                <div class="radar-spinner"></div>
+                <h4>Auto-Discovery Active</h4>
+                <p>
+                    The IoT Core is continuously listening for physical device broadcasts via <strong>MQTT</strong>, <strong>Bluetooth LE</strong>, and <strong>Zigbee</strong>.
+                    When you power on a new physical sensor, relay, or smart bulb on your home network, it will be automatically registered and displayed here.
+                </p>
+                <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                    <span class="pill-badge">📡 MQTT: Port 1883</span>
+                    <span class="pill-badge">📶 BLE Scanner: Active</span>
+                    <span class="pill-badge">🎛️ Zigbee Coordinator: Ready</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script th:src="@{/js/app.js(v=110)}"></script>
+</body>
+</html>

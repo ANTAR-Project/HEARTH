@@ -1,0 +1,19 @@
+# Secrets & local config — never commit these
+.env
+go2rtc.yaml
+mosquitto/data/
+mosquitto/log/
+mosquitto/config/passwd
+
+# Dev/test scratch files
+scratch/
+
+# Build output
+target/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Home Assistant</title>
+    <link rel="stylesheet" th:href="@{/css/style.css(v=5)}">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            </div>
+            <div class="brand-text">
+                <h1>Home Core</h1>
+                <span>MVC Gateway</span>
+            </div>
+        </a>
+
+        <div class="nav-links">
+            <a href="/" class="nav-link active">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                Dashboard
+            </a>
+            <a href="/devices" class="nav-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v12H4z M2 4v16h20V4H2zm2 2h16v12H4V6z"/></svg>
+                Devices
+            </a>
+            <a href="/adapters" class="nav-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                Adapters
+            </a>
+        </div>
+
+        <div class="nav-status">
+            <div id="ws-badge" class="ws-badge">
+                <span class="ws-pulse"></span>
+                <span id="ws-status-text">Connecting...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+
+        <!-- Top Metrics KPI Banner -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon indigo">⚡</div>
+                <div class="stat-content">
+                    <h3>Active Entities</h3>
+                    <div class="value" th:text="${stats.totalEntities}">12</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon cyan">📡</div>
+                <div class="stat-content">
+                    <h3>Online Nodes</h3>
+                    <div class="value" th:text="${stats.onlineDevices} + ' / ' + ${stats.totalDevices}">5 / 5</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon emerald">🔄</div>
+                <div class="stat-content">
+                    <h3>Automations</h3>
+                    <div class="value" th:text="${stats.activeAutomations}">2</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon amber">🌐</div>
+                <div class="stat-content">
+                    <h3>Protocols</h3>
+                    <div class="value" style="font-size: 1.15rem; font-weight: 700; color: #cbd5e1; margin-top: 0.35rem;">
+                        <span style="color: var(--accent-glow)">MQTT</span> • 
+                        <span style="color: var(--accent-cyan)">BLE</span> • 
+                        <span style="color: var(--accent-amber)">ZIGBEE</span> • 
+                        <span style="color: #c084fc">CAMERA</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Room / Area Sections -->
+        <div class="section-header">
+            <h2>
+                <span>Smart Home Zones</span>
+                <span class="section-badge" th:text="${areas.size()} + ' Rooms'">4 Rooms</span>
+            </h2>
+        </div>
+
+        <div class="areas-grid">
+            <!-- Iterate over each room area -->
+            <div class="area-card" th:each="area : ${areas}">
+                <div class="area-title">
+                    <h3>
+                        <span th:text="${area.icon != null ? area.icon : '🏠'}">🛋️</span>
+                        <span th:text="${area.name}">Living Room</span>
+                    </h3>
+                    <span class="area-badge" th:text="${area.floor != null ? area.floor : 'Ground'}">Ground</span>
+                </div>
+
+                <div class="entity-list">
+                    <!-- Entity Item -->
+                    <div th:each="entity : ${entitiesByArea.get(area.id)}" 
+                         th:id="'entity-' + ${entity.entityId}"
+                         th:class="'entity-tile ' + (${entity.domain == 'camera'} ? 'camera-tile ' : '') + (${entity.state == 'ON'} ? 'state-on' : (${entity.state == 'unavailable'} ? 'state-unavailable' : 'state-off'))">
+                        
+                        <!-- Top Row: Info & Actions -->
+                        <div class="entity-main-row">
+                            <div class="entity-info">
+                                <div class="entity-icon" th:switch="${entity.domain}">
+                                    <span th:case="'light'">💡</span>
+                                    <span th:case="'switch'">🔌</span>
+                                    <span th:case="'binary_sensor'">🚨</span>
+                                    <span th:case="'sensor'">🌡️</span>
+                                    <span th:case="'camera'">📹</span>
+                                    <span th:case="*">⚙️</span>
+                                </div>
+                                <div class="entity-meta">
+                                    <h4 th:text="${entity.name}">Living Room Light</h4>
+                                    <span th:text="${entity.entityId}">light.living_room</span>
+                                </div>
+                            </div>
+
+                            <!-- Action/Value Column -->
+                            <div class="entity-actions">
+                                <!-- Toggle Button for Light / Switch -->
+                                <button th:if="${entity.domain == 'light' or entity.domain == 'switch'}"
+                                        th:class="'toggle-btn ' + (${entity.state == 'ON'} ? 'active' : '')"
+                                        th:disabled="${entity.state == 'unavailable'}"
+                                        th:data-domain="${entity.domain}"
+                                        th:data-entity="${entity.entityId}"
+                                        onclick="toggleSwitch(this, this.getAttribute('data-domain'), this.getAttribute('data-entity'))">
+                                    <span class="toggle-knob"></span>
+                                </button>
+
+                                <!-- Motion Detector Badge -->
+                                <span th:if="${entity.domain == 'binary_sensor'}"
+                                      th:class="'motion-badge ' + (${entity.state == 'ON'} ? 'active' : 'inactive')"
+                                      th:text="${entity.state == 'ON' ? 'DETECTED' : 'CLEAR'}">
+                                    CLEAR
+                                </span>
+
+                                <!-- Sensor Value Badge -->
+                                <span th:if="${entity.domain == 'sensor'}" 
+                                      class="sensor-pill"
+                                      th:text="${entity.state} + ' ' + (${entity.attributes != null and entity.attributes.unit_of_measurement != null ? entity.attributes.unit_of_measurement : ''})">
+                                    22.5 °C
+                                </span>
+
+                                <!-- Camera Actions -->
+                                <div th:if="${entity.domain == 'camera'}" class="camera-actions">
+                                    <button class="btn-cam-action" th:id="'webrtc-btn-' + ${entity.entityId}" th:data-entity="${entity.entityId}" onclick="toggleWebRtcStream(this.getAttribute('data-entity'))" style="background: rgba(16, 185, 129, 0.2); border-color: rgba(16, 185, 129, 0.4);">⚡ WebRTC (Live & Audio)</button>
+                                    <button class="btn-cam-action" th:id="'stream-btn-' + ${entity.entityId}" th:data-entity="${entity.entityId}" onclick="toggleLiveStream(this.getAttribute('data-entity'))">▶ HLS Stream</button>
+                                    <button class="btn-cam-action" th:data-entity="${entity.entityId}" onclick="recordCameraClip(this.getAttribute('data-entity'))" style="background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.4); color: #f87171;">🔴 Record to TrueNAS</button>
+                                    <button class="btn-cam-action" th:data-entity="${entity.entityId}" onclick="refreshCameraSnapshot(this.getAttribute('data-entity'))">🔄 Refresh</button>
+                                    <button class="btn-cam-action" th:data-entity="${entity.entityId}" onclick="simulateCameraMotion(this.getAttribute('data-entity'))">🚨 Motion</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Full-width Camera Container with PTZ Controls (Spans 100% width) -->
+                        <div th:if="${entity.domain == 'camera'}" class="camera-container">
+                            <div class="camera-header">
+                                <span>CP PLUS E28A • ONVIF RTSP :5543</span>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <span class="section-badge" th:id="'stream-badge-' + ${entity.entityId}" style="color: var(--text-muted);">SNAPSHOT</span>
+                                    <span class="section-badge" style="color: var(--accent-emerald);">ONLINE (VLAN 30)</span>
+                                </div>
+                            </div>
+                            <div style="position: relative; overflow: hidden; background: #000; min-height: 220px;">
+                                <img th:id="'cam-img-' + ${entity.entityId}"
+                                     class="camera-feed-img"
+                                     th:src="@{'/api/camera/' + ${entity.entityId} + '/snapshot'}"
+                                     alt="Camera Live Stream Snapshot" />
+                                <video th:id="'cam-video-' + ${entity.entityId}"
+                                       class="camera-feed-img"
+                                       style="display: none; width: 100%; height: 100%; object-fit: cover;"
+                                       autoplay playsinline controls></video>
+
+                                <!-- Floating PTZ D-Pad Controller -->
+                                <div class="ptz-pad">
+                                    <button class="ptz-btn ptz-up" th:data-entity="${entity.entityId}" onclick="sendPtz(this.getAttribute('data-entity'), 'PTZ_UP')" title="Tilt Up">▲</button>
+                                    <div class="ptz-mid-row">
+                                        <button class="ptz-btn ptz-left" th:data-entity="${entity.entityId}" onclick="sendPtz(this.getAttribute('data-entity'), 'PTZ_LEFT')" title="Pan Left">◀</button>
+                                        <button class="ptz-btn ptz-stop" th:data-entity="${entity.entityId}" onclick="sendPtz(this.getAttribute('data-entity'), 'PTZ_STOP')" title="Stop Movement">●</button>
+                                        <button class="ptz-btn ptz-right" th:data-entity="${entity.entityId}" onclick="sendPtz(this.getAttribute('data-entity'), 'PTZ_RIGHT')" title="Pan Right">▶</button>
+                                    </div>
+                                    <button class="ptz-btn ptz-down" th:data-entity="${entity.entityId}" onclick="sendPtz(this.getAttribute('data-entity'), 'PTZ_DOWN')" title="Tilt Down">▼</button>
+                                </div>
+                            </div>
+                            <div class="camera-footer">
+                                <span class="rtsp-url-pill">rtsp://admin:***@192.168.30.247:5543/live/channel0</span>
+                                <button class="btn-cam-action" th:data-entity="${entity.entityId}" onclick="copyRtspUrl(this.getAttribute('data-entity'))">📋 Copy VLC Link</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TrueNAS Surveillance Vault Section -->
+        <div class="section-header" style="margin-top: 2.5rem;">
+            <h2>
+                <span>📼 TrueNAS Surveillance Vault</span>
+                <span class="section-badge" style="color: var(--accent-emerald);">ZFS SMB • 192.168.20.103</span>
+            </h2>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <select id="record-duration-select" class="btn-cam-action" style="padding: 0.4rem 0.8rem; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255,255,255,0.1); color: var(--text-main);">
+                    <option value="10">10 Seconds Clip</option>
+                    <option value="15" selected>15 Seconds Clip</option>
+                    <option value="30">30 Seconds Clip</option>
+                    <option value="60">60 Seconds Clip</option>
+                </select>
+                <button id="record-clip-btn" class="btn-cam-action" onclick="recordCameraClip('camera.front_porch_cam')" style="background: rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 0.5); color: #f87171; font-weight: 600;">
+                    🔴 Record Clip
+                </button>
+                <button class="btn-cam-action" onclick="loadTrueNasRecordings()">
+                    🔄 Refresh Vault
+                </button>
+            </div>
+        </div>
+
+        <div class="truenas-vault-card" style="background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 1rem; padding: 1.25rem; margin-bottom: 2rem;">
+            <div id="vault-status-bar" style="display: none; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 0.5rem; font-size: 0.875rem;"></div>
+            
+            <div class="recordings-table-wrap" style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.875rem;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                            <th style="padding: 0.75rem;">Recording ID</th>
+                            <th style="padding: 0.75rem;">File Name</th>
+                            <th style="padding: 0.75rem;">Size</th>
+                            <th style="padding: 0.75rem;">Recorded At</th>
+                            <th style="padding: 0.75rem;">Pipeline Status</th>
+                            <th style="padding: 0.75rem; text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recordings-list-body">
+                        <tr>
+                            <td colspan="6" style="padding: 2rem; text-align: center; color: var(--text-muted);">
+                                Loading recordings from TrueNAS SMB storage...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Video Playback Modal Overlay -->
+        <div id="playback-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 9999; align-items: center; justify-content: center;">
+            <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.12); border-radius: 1rem; width: 90%; max-width: 800px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <h3 id="modal-title" style="margin: 0; font-size: 1.1rem; color: #fff;">Surveillance Recording</h3>
+                    <button onclick="closePlaybackModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer;">✕</button>
+                </div>
+                <div style="background: #000; position: relative;">
+                    <video id="modal-video-player" controls style="width: 100%; max-height: 480px; display: block;"></video>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; font-size: 0.85rem; color: var(--text-muted);">
+                    <span id="modal-meta-info">TrueNAS ZFS Storage • Direct Playback</span>
+                    <a id="modal-download-btn" href="#" class="btn-cam-action" style="text-decoration: none; display: inline-block;">⬇ Download Raw MP4</a>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script th:src="@{/js/app.js(v=14)}"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+target/
+.git/
+.gitignore
+.idea/
+.vscode/
+bin/
+scratch/
+TrueNAS-Orchestrator-API-PoC/
+*.log
+*.md

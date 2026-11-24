@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devices | Home Assistant</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="nav-brand">
+            <div class="brand-icon">
+                <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+            </div>
+            <div class="brand-text">
+                <h1>Home Core</h1>
+                <span>MVC Gateway</span>
+            </div>
+        </a>
+
+        <div class="nav-links">
+            <a href="/" class="nav-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+                Dashboard
+            </a>
+            <a href="/devices" class="nav-link active">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v12H4z M2 4v16h20V4H2zm2 2h16v12H4V6z"/></svg>
+                Devices
+            </a>
+            <a href="/adapters" class="nav-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                Adapters
+            </a>
+        </div>
+
+        <div class="nav-status">
+            <div id="ws-badge" class="ws-badge">
+                <span class="ws-pulse"></span>
+                <span id="ws-status-text">Connected</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Protocol Summary Stats -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon indigo">📡</div>
+                <div class="stat-content">
+                    <h3>MQTT Devices</h3>
+                    <div class="value" th:text="${mqttCount}">2</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon cyan">📶</div>
+                <div class="stat-content">
+                    <h3>BLE Peripherals</h3>
+                    <div class="value" th:text="${bleCount}">2</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon amber">🌐</div>
+                <div class="stat-content">
+                    <h3>Zigbee Nodes</h3>
+                    <div class="value" th:text="${zigbeeCount}">3</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon purple" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;">📹</div>
+                <div class="stat-content">
+                    <h3>IP Cameras</h3>
+                    <div class="value" th:text="${cameraCount}">1</div>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon emerald">✓</div>
+                <div class="stat-content">
+                    <h3>Total Registered</h3>
+                    <div class="value" th:text="${devices.size()}">8</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Devices Table -->
+        <div class="section-header">
+            <h2>
+                <span>Device Inventory</span>
+                <span class="section-badge" th:text="${devices.size()} + ' Units'">7 Units</span>
+            </h2>
+        </div>
+
+        <div class="table-card">
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Device Name</th>
+                        <th>Protocol</th>
+                        <th>Area</th>
+                        <th>Identifier / Address</th>
+                        <th>MQTT Topic Prefix</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="dev : ${devices}">
+                        <td>
+                            <div class="status-indicator">
+                                <span th:id="'dev-status-' + ${dev.id}"
+                                      th:class="'status-dot ' + (${dev.online} ? 'online' : 'offline')"></span>
+                                <span th:text="${dev.online ? 'Online' : 'Offline'}">Online</span>
+                            </div>
+                        </td>
+                        <td>
+                            <strong th:text="${dev.name}">Living Room Plug</strong>
+                            <div style="font-size: 0.72rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace;" th:text="${dev.id}">zigbee_living_room_plug</div>
+                        </td>
+                        <td>
+                            <span th:class="'protocol-badge ' + ${dev.protocol.toLowerCase()}" th:text="${dev.protocol}">ZIGBEE</span>
+                        </td>
+                        <td>
+                            <span th:text="${areaNames.get(dev.areaId) != null ? areaNames.get(dev.areaId) : 'Unassigned'}">Living Room</span>
+                        </td>
+                        <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--text-muted);">
+                            <span th:text="${dev.macAddress != null ? dev.macAddress : (dev.ipAddress != null ? dev.ipAddress : '—')}">00:15:8D:00:01:2A:3B:4C</span>
+                        </td>
+                        <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: var(--accent-cyan);">
+                            <span th:text="${dev.mqttTopicPrefix != null ? dev.mqttTopicPrefix : '—'}">zigbee2mqtt/zigbee_living_room_plug</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script th:src="@{/js/app.js}"></script>
+</body>
+</html>

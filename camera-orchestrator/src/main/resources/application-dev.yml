@@ -1,0 +1,37 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  datasource:
+    url: jdbc:h2:mem:homeassistant;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+
+mqtt:
+  enabled: true
+  auto-startup: false
+
+ble:
+  enabled: true
+
+camera:
+  enabled: true
+  default-ip: ${CAMERA_DEFAULT_IP:192.168.X.X}
+  subnet: ${CAMERA_SUBNET:192.168.X.X/24}
+
+zigbee:
+  enabled: true
