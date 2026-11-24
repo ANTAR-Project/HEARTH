@@ -25,19 +25,26 @@ public class PolicyDecider {
 
     private final String nasEndpoint;
     private final String elementEndpoint;
+    private final String userEndpoint;
     private final Map<String, ManagedChannel> channels = new ConcurrentHashMap<>();
     private final Map<String, PolicyGrpc.PolicyBlockingStub> stubs = new ConcurrentHashMap<>();
 
     public PolicyDecider(
         @Value("${hearth.policy.endpoints.NAS:policy-registry:9001}") String nasEndpoint,
-        @Value("${hearth.policy.endpoints.ELEMENT:policy-registry:9001}") String elementEndpoint
+        @Value("${hearth.policy.endpoints.ELEMENT:policy-registry:9001}") String elementEndpoint,
+        @Value("${hearth.policy.endpoints.USER:policy-registry:9001}") String userEndpoint
     ) {
         this.nasEndpoint = nasEndpoint;
         this.elementEndpoint = elementEndpoint;
+        this.userEndpoint = userEndpoint;
     }
 
     private PolicyGrpc.PolicyBlockingStub getStub(String domain) {
-        String endpoint = "ELEMENT".equalsIgnoreCase(domain) ? elementEndpoint : nasEndpoint;
+        String endpoint = switch (domain.toUpperCase()) {
+            case "ELEMENT" -> elementEndpoint;
+            case "USER"    -> userEndpoint;
+            default        -> nasEndpoint;
+        };
         return stubs.computeIfAbsent(endpoint, ep -> {
             String[] parts = ep.split(":");
             String host = parts[0];

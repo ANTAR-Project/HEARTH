@@ -33,10 +33,10 @@ public class PolicyGrpcServer extends PolicyGrpc.PolicyImplBase {
             request.getNamespace());
 
         String domain = request.getDomain();
-        if (domain == null || (!domain.equals("NAS") && !domain.equals("ELEMENT"))) {
+        if (domain == null || (!domain.equals("NAS") && !domain.equals("ELEMENT") && !domain.equals("USER"))) {
             log.warn("DecideRequest rejected (invalid domain '{}')", domain);
             responseObserver.onError(Status.INVALID_ARGUMENT
-                .withDescription("domain must be NAS or ELEMENT").asRuntimeException());
+                .withDescription("domain must be NAS, ELEMENT, or USER").asRuntimeException());
             return;
         }
 
