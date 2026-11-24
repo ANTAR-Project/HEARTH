@@ -28,4 +28,4 @@ replay_pid*
 temp/
 
 *.env
-.github
+.githubsecrets/
