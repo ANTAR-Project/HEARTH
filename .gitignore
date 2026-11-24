@@ -28,4 +28,7 @@ replay_pid*
 temp/
 
 *.env
-.githubsecrets/
+.github
+
+secrets/
+*.pem

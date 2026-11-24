@@ -1,9 +1,7 @@
 package com.antar.videoservice.config;
 
-import com.tamojit.grpc.auth.AuthGrpcServiceGrpc;
-import com.tamojit.grpc.filetransfer.FileTransferGrpcServiceGrpc;
+import com.antar.grpc.filetransfer.FileTransferGrpcServiceGrpc;
 import com.antar.videoservice.grpc.GrpcAuthClientInterceptor;
-import com.antar.videoservice.security.ServiceAuthTokenProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.client.GrpcChannelFactory;
@@ -11,17 +9,11 @@ import org.springframework.grpc.client.GrpcChannelFactory;
 @Configuration
 public class GrpcClientConfig {
 
-    // No service token on auth calls — auth-service has no gRPC server interceptor
-    @Bean
-    public AuthGrpcServiceGrpc.AuthGrpcServiceBlockingStub authGrpcStub(GrpcChannelFactory channels) {
-        return AuthGrpcServiceGrpc.newBlockingStub(channels.createChannel("auth-service"));
-    }
-
     // Service token required — nas-orchestrator's GrpcAuthInterceptor validates it
     @Bean
     public FileTransferGrpcServiceGrpc.FileTransferGrpcServiceStub fileTransferGrpcAsyncStub(
         GrpcChannelFactory channels,
-        ServiceAuthTokenProvider tokenProvider
+        ServiceTokenRefresher tokenProvider
     ) {
         GrpcAuthClientInterceptor interceptor = new GrpcAuthClientInterceptor(tokenProvider);
         return FileTransferGrpcServiceGrpc.newStub(channels.createChannel("nas-orchestrator"))
@@ -31,7 +23,7 @@ public class GrpcClientConfig {
     @Bean
     public FileTransferGrpcServiceGrpc.FileTransferGrpcServiceBlockingStub fileTransferGrpcBlockingStub(
         GrpcChannelFactory channels,
-        ServiceAuthTokenProvider tokenProvider
+        ServiceTokenRefresher tokenProvider
     ) {
         GrpcAuthClientInterceptor interceptor = new GrpcAuthClientInterceptor(tokenProvider);
         return FileTransferGrpcServiceGrpc.newBlockingStub(channels.createChannel("nas-orchestrator"))
