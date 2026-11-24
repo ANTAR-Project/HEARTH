@@ -32,3 +32,4 @@ temp/
 
 secrets/
 *.pem
+*.DS_Store
