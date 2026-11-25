@@ -1,7 +1,6 @@
 package com.antar.streamingservice.controller;
 
 import com.antar.hearth.common.ScopeEnforcer;
-import com.antar.streamingservice.config.ServiceTokenRefresher;
 import com.antar.streamingservice.dto.PlaylistDto;
 import com.antar.streamingservice.hearth.HearthPrincipal;
 import com.antar.streamingservice.service.PlaylistService;
@@ -29,7 +28,6 @@ public class StreamingController {
 
     private final StreamingService streamingService;
     private final PlaylistService playlistService;
-    private final ServiceTokenRefresher serviceTokenRefresher;
     private final RedisTemplate<String, String> redisTemplate;
 
     private HearthPrincipal principal(HttpServletRequest request) {
@@ -61,12 +59,12 @@ public class StreamingController {
             return ResponseEntity.notFound().build();
         }
 
-        String token = resolveStreamingToken(request);
+        String clientToken = resolveClientToken(request);
 
         log.info("Proxying playlist for movieId: {} at path: {}", scopedPath, playlistPath);
         return ResponseEntity.ok()
             .header("Content-Type", "application/x-mpegURL")
-            .body(streamingService.getPlaylist(playlistPath, token));
+            .body(streamingService.getPlaylist(playlistPath, clientToken));
     }
 
     @GetMapping("/playlists")
@@ -77,20 +75,11 @@ public class StreamingController {
         return ResponseEntity.ok(playLists);
     }
 
-    private String resolveStreamingToken(HttpServletRequest request) {
+    private String resolveClientToken(HttpServletRequest request) {
         String tokenParam = request.getParameter("token");
         if (tokenParam != null && !tokenParam.isBlank()) {
             return tokenParam;
         }
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
-        }
-        try {
-            return serviceTokenRefresher.get();
-        } catch (Exception e) {
-            log.warn("Could not obtain service token for streaming playlist proxying: {}", e.getMessage());
-            return "";
-        }
+        return "";
     }
 }

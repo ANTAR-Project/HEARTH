@@ -394,6 +394,21 @@ spring:
                 hearth:
                   public: true
 
+            # Direct pass-through for rewritten URLs emitted by nas-orchestrator StreamingService
+            - id: nas-orchestrator-stream-playlist
+              uri: http://nas-orchestrator:9002
+              predicates: [Path=/api/v1/nas-orchestrator/stream/playlist, Method=GET]
+              metadata:
+                hearth:
+                  public: true
+
+            - id: nas-orchestrator-stream-segment
+              uri: http://nas-orchestrator:9002
+              predicates: [Path=/api/v1/nas-orchestrator/stream/segment, Method=GET]
+              metadata:
+                hearth:
+                  public: true
+
             # ─────────────────────────────────────────────
             # VIDEO SERVICE  (video-service:9004)
             # ─────────────────────────────────────────────
