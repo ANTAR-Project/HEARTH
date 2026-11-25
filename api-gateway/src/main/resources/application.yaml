@@ -46,13 +46,27 @@ spring:
               metadata:
                 hearth:
                   bypass-policy: true   # JWT verified; no policy check needed
+                  audience: auth-service
+                  intent: user.session.logout
+                  action: DELETE
+                  domain: USER
+                  resourceType: ACCOUNT
+                  resourceId: "{username}"
+                  namespace: OWN
 
             - id: auth-users-create
               uri: http://auth-service:9000
               predicates: [Path=/api/v1/auth/users, Method=POST]
               metadata:
                 hearth:
-                  bypass-policy: true   # OWNER check is done inside AuthController
+                  bypass-policy: true   # role-level guard is enforced inside AuthController
+                  audience: auth-service
+                  intent: user.account.create
+                  action: CREATE
+                  domain: USER
+                  resourceType: ACCOUNT
+                  resourceId: "{username}"
+                  namespace: OWN
 
             - id: auth-users-list
               uri: http://auth-service:9000
@@ -60,6 +74,13 @@ spring:
               metadata:
                 hearth:
                   bypass-policy: true
+                  audience: auth-service
+                  intent: user.account.list
+                  action: LIST
+                  domain: USER
+                  resourceType: ACCOUNT
+                  resourceId: "{username}"
+                  namespace: OWN
 
             - id: auth-jwks
               uri: http://auth-service:9000
@@ -77,7 +98,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/list, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.list
@@ -92,7 +113,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/download, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.read
@@ -107,7 +128,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/preview, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.read
@@ -118,14 +139,15 @@ spring:
                   resourceId: "{username}"
                   namespace: OWN
 
+            # Upload routes → nas.workspace.create (seed: NAS / OWNER|RESIDENT|GUEST / CREATE / WORKSPACE / OWN)
             - id: nas-files-upload-file
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/upload/file, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.upload.file
+                  intent: nas.workspace.create
                   action: CREATE
                   domain: NAS
                   audience: nas-orchestrator
@@ -137,10 +159,10 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/upload/folder, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.upload.file
+                  intent: nas.workspace.create
                   action: CREATE
                   domain: NAS
                   audience: nas-orchestrator
@@ -152,7 +174,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/mkdir, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.create
@@ -167,7 +189,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/files/delete, Method=DELETE]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.delete
@@ -178,18 +200,22 @@ spring:
                   resourceId: "{username}"
                   namespace: OWN
 
+            # ── Shared workspace routes ──────────────────────────────────────────
+            # resource_type stays WORKSPACE; namespace=SHARED drives scope matching.
+            # ownership:SELF condition in seed means only the caller's own items in shared space.
+
             - id: nas-shared-list
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/list, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.read
-                  action: READ
+                  intent: nas.workspace.list
+                  action: LIST
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -197,14 +223,14 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/download, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.read
+                  intent: nas.workspace.read
                   action: READ
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -212,29 +238,30 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/preview, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.read
+                  intent: nas.workspace.read
                   action: READ
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
+            # Shared uploads → CREATE with ownership:SELF enforced by engine
             - id: nas-shared-upload-file
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/upload/file, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.update
-                  action: UPDATE
+                  intent: nas.workspace.create
+                  action: CREATE
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -242,14 +269,14 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/upload/folder, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.update
-                  action: UPDATE
+                  intent: nas.workspace.create
+                  action: CREATE
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -257,29 +284,30 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/mkdir, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.update
-                  action: UPDATE
+                  intent: nas.workspace.create
+                  action: CREATE
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
+            # Shared deletes → DELETE with ownership:SELF enforced by engine
             - id: nas-shared-delete
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/delete, Method=DELETE]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.update
-                  action: UPDATE
+                  intent: nas.workspace.delete
+                  action: DELETE
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -287,14 +315,14 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/shared/clear, Method=DELETE]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.shared.update
+                  intent: nas.workspace.delete
                   action: DELETE
                   domain: NAS
                   audience: nas-orchestrator
-                  resourceType: SHARED
+                  resourceType: WORKSPACE
                   resourceId: "shared"
                   namespace: SHARED
 
@@ -302,7 +330,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/workspace/create, Method=POST]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.create
@@ -317,7 +345,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/workspace/delete, Method=DELETE]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.delete
@@ -332,7 +360,7 @@ spring:
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/workspace/clear, Method=DELETE]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   intent: nas.workspace.delete
@@ -343,21 +371,25 @@ spring:
                   resourceId: "{username}"
                   namespace: OWN
 
-            # HLS streaming — public; nas-orchestrator validates its own ?token= query param
+            # ── HLS streaming (/api/v1/nas/stream/…) ────────────────────────────
+            # Media player clients (Video.js, hls.js, native Safari) fetch playlists
+            # and .ts segments using query param URLs (?token=...), not Authorization headers.
+            # Gateway passes through (public: true); nas-orchestrator handles streaming.
+
             - id: nas-stream-playlist
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/stream/playlist, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  public: true   # gateway passes through; StreamingController validates ?token=
+                  public: true
 
             - id: nas-stream-segment
               uri: http://nas-orchestrator:9002
               predicates: [Path=/api/v1/nas/stream/segment, Method=GET]
               filters:
-                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/$\{seg}
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
                   public: true
@@ -366,12 +398,13 @@ spring:
             # VIDEO SERVICE  (video-service:9004)
             # ─────────────────────────────────────────────
 
+            # Video upload writes into the caller's OWN workspace → nas.workspace.create
             - id: video-upload
               uri: http://video-service:9004
               predicates: [Path=/api/v1/videos/upload, Method=POST]
               metadata:
                 hearth:
-                  intent: nas.upload.file
+                  intent: nas.workspace.create
                   action: CREATE
                   domain: NAS
                   audience: video-service
@@ -381,6 +414,8 @@ spring:
 
             # ─────────────────────────────────────────────
             # STREAMING SERVICE  (streaming-service:9006)
+            # /stream routes fetch media files from the caller's OWN workspace
+            # → treated as WORKSPACE READs (same as nas-stream-* above).
             # ─────────────────────────────────────────────
 
             - id: streaming-root
@@ -388,11 +423,11 @@ spring:
               predicates: [Path=/api/v1/stream, Method=GET]
               metadata:
                 hearth:
-                  intent: nas.media.stream
-                  action: STREAM
+                  intent: nas.workspace.read
+                  action: READ
                   domain: NAS
                   audience: streaming-service
-                  resourceType: MEDIA
+                  resourceType: WORKSPACE
                   resourceId: "{username}"
                   namespace: OWN
 
@@ -401,16 +436,17 @@ spring:
               predicates: [Path=/api/v1/stream/playlists, Method=GET]
               metadata:
                 hearth:
-                  intent: nas.media.stream
-                  action: STREAM
+                  intent: nas.workspace.read
+                  action: READ
                   domain: NAS
                   audience: streaming-service
-                  resourceType: MEDIA
+                  resourceType: WORKSPACE
                   resourceId: "{username}"
                   namespace: OWN
 
             # ─────────────────────────────────────────────
             # ELEMENT REGISTRY  (element-registry:9003)
+            # intent names match seed: element.element.{control|read}
             # ─────────────────────────────────────────────
 
             - id: element-state
@@ -418,7 +454,7 @@ spring:
               predicates: ["Path=/api/v1/elements/{elementId}/state", Method=PUT]
               metadata:
                 hearth:
-                  intent: element.device.control
+                  intent: element.element.control
                   action: CONTROL
                   domain: ELEMENT
                   audience: element-registry
@@ -431,7 +467,7 @@ spring:
               predicates: ["Path=/api/v1/elements/{elementId}", Method=GET]
               metadata:
                 hearth:
-                  intent: element.device.read
+                  intent: element.element.read
                   action: READ
                   domain: ELEMENT
                   audience: element-registry
@@ -475,3 +511,4 @@ hearth:
     endpoints:
       NAS: policy-registry:9001
       ELEMENT: policy-registry:9001
+      USER: policy-registry:9001

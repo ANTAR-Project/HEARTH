@@ -6,7 +6,7 @@ server:
 
 spring:
   application:
-    name: home-assistant-backend
+    name: camera-orchestrator
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
