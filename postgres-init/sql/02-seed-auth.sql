@@ -80,4 +80,5 @@ VALUES ('video-service',        'nas-orchestrator', :'video_svc_hash',        'n
        ('encoding-service',     'nas-orchestrator', :'encoding_svc_hash',     'nas:read:raw/** nas:write:encoded/**'),
        ('streaming-service',    'nas-orchestrator', :'streaming_svc_hash',    'nas:read:encoded/**'),
        ('api-gateway',          'element-registry', :'gateway_svc_hash',      'elements:read'),
-       ('notification-service', 'auth-service',     :'notification_svc_hash', 'user:read:profile');
+       ('notification-service', 'auth-service',     :'notification_svc_hash', 'user:read:profile'),
+       ('camera-orchestrator',  'nas-orchestrator', :'camera_svc_hash',       'nas:read:raw/** nas:write:raw/** nas:read:encoded/** nas:delete:**');

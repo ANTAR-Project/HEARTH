@@ -3,6 +3,7 @@ package com.antar.cameraorchestrator.service.adapter.camera;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.antar.cameraorchestrator.config.CameraConfig;
+import com.antar.cameraorchestrator.grpc.NasOrchestratorGrpcClient;
 import com.antar.cameraorchestrator.model.dto.RecordingItemDto;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -31,6 +32,7 @@ public class CameraRecordingService {
 
     private static final Logger log = LoggerFactory.getLogger(CameraRecordingService.class);
     private final CameraConfig cameraConfig;
+    private final NasOrchestratorGrpcClient nasGrpcClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -42,8 +44,9 @@ public class CameraRecordingService {
         return t;
     });
 
-    public CameraRecordingService(CameraConfig cameraConfig) {
+    public CameraRecordingService(CameraConfig cameraConfig, NasOrchestratorGrpcClient nasGrpcClient) {
         this.cameraConfig = cameraConfig;
+        this.nasGrpcClient = nasGrpcClient;
     }
 
     /**
@@ -140,13 +143,13 @@ public class CameraRecordingService {
                 }
 
                 long fileSizeBytes = Files.size(tempFile);
-                log.info("Captured clip [id={}, size={} bytes]. Uploading to TrueNAS video-service...", recordingId, fileSizeBytes);
+                log.info("Captured clip [id={}, size={} bytes]. Uploading to nas-orchestrator via gRPC...", recordingId, fileSizeBytes);
 
-                // Upload to video-service
-                uploadToVideoService(recordingId, filename, tempFile);
+                // Upload directly to nas-orchestrator Shared folder over authenticated gRPC
+                nasGrpcClient.uploadFile("shared/" + filename, tempFile.toFile());
 
-                log.info("Successfully recorded and ingested clip [id={}] into TrueNAS!", recordingId);
-                return new RecordingItemDto(recordingId, filename, fileSizeBytes, System.currentTimeMillis(), "PROCESSING");
+                log.info("Successfully recorded and stored clip [id={}] in TrueNAS!", recordingId);
+                return new RecordingItemDto(recordingId, filename, fileSizeBytes, System.currentTimeMillis(), "RAW");
 
             } catch (Exception e) {
                 log.error("Failed recording/uploading clip for [id={}]: {}", recordingId, e.getMessage(), e);
@@ -159,38 +162,6 @@ public class CameraRecordingService {
                 }
             }
         }, recordingExecutor);
-    }
-
-    /**
-     * Uploads the local video file to video-service via multipart POST.
-     */
-    private void uploadToVideoService(String recordingId, String filename, Path filePath) throws IOException, InterruptedException {
-        String uploadUrl = cameraConfig.getVideoServiceUrl() + "/api/v1/videos/upload/" + recordingId;
-        String boundary = "----AntarBoundary" + System.currentTimeMillis();
-
-        byte[] fileBytes = Files.readAllBytes(filePath);
-
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        baos.write(("--" + boundary + "\r\n").getBytes(StandardCharsets.UTF_8));
-        baos.write(("Content-Disposition: form-data; name=\"file\"; filename=\"" + filename + "\"\r\n").getBytes(StandardCharsets.UTF_8));
-        baos.write("Content-Type: video/mp4\r\n\r\n".getBytes(StandardCharsets.UTF_8));
-        baos.write(fileBytes);
-        baos.write("\r\n".getBytes(StandardCharsets.UTF_8));
-        baos.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-
-        byte[] requestPayload = baos.toByteArray();
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(uploadUrl))
-                .timeout(Duration.ofMinutes(2))
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(requestPayload))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("video-service upload returned HTTP " + response.statusCode() + ": " + response.body());
-        }
     }
 
     /**
@@ -274,25 +245,19 @@ public class CameraRecordingService {
     }
 
     /**
-     * Checks whether the streaming-service has the master HLS playlist registered.
+     * Checks whether the encoded HLS master playlist exists in nas-orchestrator via gRPC.
      */
     private boolean isHlsStreamReady(String recordingId) {
         try {
-            String url = cameraConfig.getStreamingServiceUrl() + "/api/v1/stream/" + recordingId;
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(2))
-                    .GET()
-                    .build();
-            HttpResponse<Void> resp = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
-            return resp.statusCode() == 200;
+            String content = nasGrpcClient.getRewrittenPlaylist("encoded/" + recordingId + "/master.m3u8", "");
+            return content != null && !content.isBlank();
         } catch (Exception e) {
             return false;
         }
     }
 
     /**
-     * Proxies the raw MP4 file from TrueNAS as an attachment download to the client on VLAN 40.
+     * Proxies the raw MP4 file from TrueNAS as an attachment download via gRPC.
      */
     public void downloadRecording(String recordingId, HttpServletResponse response) throws IOException {
         RecordingItemDto item = inspectRecordingFolder(recordingId);
@@ -302,13 +267,11 @@ public class CameraRecordingService {
         }
 
         String path = "raw/" + recordingId + "/" + item.getFilename();
-        String url = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/files/download?path=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
-
-        forwardStream(url, response, "video/mp4", "attachment; filename=\"" + item.getFilename() + "\"");
+        nasGrpcClient.downloadToResponse(path, response, "video/mp4", "attachment; filename=\"" + item.getFilename() + "\"");
     }
 
     /**
-     * Proxies the raw MP4 file inline for direct HTML5 browser video playback.
+     * Proxies the raw MP4 file inline for direct HTML5 browser video playback via gRPC.
      */
     public void previewRecording(String recordingId, HttpServletResponse response) throws IOException {
         RecordingItemDto item = inspectRecordingFolder(recordingId);
@@ -318,9 +281,7 @@ public class CameraRecordingService {
         }
 
         String path = "raw/" + recordingId + "/" + item.getFilename();
-        String url = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/files/download?path=" + URLEncoder.encode(path, StandardCharsets.UTF_8);
-
-        forwardStream(url, response, "video/mp4", "inline; filename=\"" + item.getFilename() + "\"");
+        nasGrpcClient.downloadToResponse(path, response, "video/mp4", "inline; filename=\"" + item.getFilename() + "\"");
     }
 
     /**
@@ -349,69 +310,35 @@ public class CameraRecordingService {
     }
 
     /**
-     * Proxies and rewrites the master HLS playlist from streaming-service to route through port 8080.
+     * Fetches and rewrites the master HLS playlist from nas-orchestrator via gRPC.
      */
     public String getHlsMasterPlaylist(String recordingId) throws IOException {
-        String url = cameraConfig.getStreamingServiceUrl() + "/api/v1/stream/" + recordingId;
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() == 200 && resp.body() != null && !resp.body().isBlank()) {
-                String body = resp.body();
+            String body = nasGrpcClient.getRewrittenPlaylist("encoded/" + recordingId + "/master.m3u8", "");
+            if (body != null && !body.isBlank()) {
                 body = body.replaceAll("(?m)^.*EXT-X-VERSION:3.*$", "#EXT-X-VERSION:3");
                 return body.replace("/api/v1/nas-orchestrator/stream/", "/api/camera/recordings/hls/");
             }
-
-            // Resilient fallback: If streaming-service returns 404 (e.g. Redis key missing or expired), fetch master playlist directly from nas-orchestrator
-            String fallbackUrl = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/stream/playlist?path=encoded/"
-                    + URLEncoder.encode(recordingId, StandardCharsets.UTF_8) + "/master.m3u8";
-            HttpRequest fallbackReq = HttpRequest.newBuilder()
-                    .uri(URI.create(fallbackUrl))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> fallbackResp = httpClient.send(fallbackReq, HttpResponse.BodyHandlers.ofString());
-            if (fallbackResp.statusCode() == 200 && fallbackResp.body() != null && !fallbackResp.body().isBlank()) {
-                String body = fallbackResp.body();
-                body = body.replaceAll("(?m)^.*EXT-X-VERSION:3.*$", "#EXT-X-VERSION:3");
-                return body.replace("/api/v1/nas-orchestrator/stream/", "/api/camera/recordings/hls/");
-            }
-
             return null;
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted fetching playlist", e);
+        } catch (Exception e) {
+            log.warn("Failed fetching master playlist via gRPC for {}: {}", recordingId, e.getMessage());
+            return null;
         }
     }
 
     /**
-     * Proxies and rewrites sub-playlists (e.g. 1080p, 720p).
+     * Fetches and rewrites sub-playlists (e.g. 1080p, 720p) from nas-orchestrator via gRPC.
      */
     public String getHlsSubPlaylist(String nasPath) throws IOException {
-        String url = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/stream/playlist?path=" + URLEncoder.encode(nasPath, StandardCharsets.UTF_8);
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> resp = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (resp.statusCode() != 200) {
+            String body = nasGrpcClient.getRewrittenPlaylist(nasPath, "");
+            if (body == null || body.isBlank()) {
                 return null;
             }
-
-            String body = resp.body();
             return body.replace("/api/v1/nas-orchestrator/stream/", "/api/camera/recordings/hls/");
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("Interrupted fetching sub-playlist", e);
+        } catch (Exception e) {
+            log.warn("Failed fetching sub-playlist via gRPC for {}: {}", nasPath, e.getMessage());
+            return null;
         }
     }
 

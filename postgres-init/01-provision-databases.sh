@@ -15,6 +15,7 @@ ENCODING_SVC_SECRET="${ENCODING_SVC_SECRET}"
 STREAMING_SVC_SECRET="${STREAMING_SVC_SECRET}"
 GATEWAY_SVC_SECRET="${GATEWAY_SVC_SECRET}"
 NOTIFICATION_SVC_SECRET="${NOTIFICATION_SVC_SECRET}"
+CAMERA_SVC_SECRET="${CAMERA_SVC_SECRET}"
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
 
@@ -85,6 +86,7 @@ ENCODING_HASH="$(hash_secret "$ENCODING_SVC_SECRET")"
 STREAMING_HASH="$(hash_secret "$STREAMING_SVC_SECRET")"
 GATEWAY_HASH="$(hash_secret "$GATEWAY_SVC_SECRET")"
 NOTIFICATION_HASH="$(hash_secret "$NOTIFICATION_SVC_SECRET")"
+CAMERA_HASH="$(hash_secret "$CAMERA_SVC_SECRET")"
 
 # Seed auth DB
 psql -v ON_ERROR_STOP=1 \
@@ -97,6 +99,7 @@ psql -v ON_ERROR_STOP=1 \
      --variable streaming_svc_hash="${STREAMING_HASH}" \
      --variable gateway_svc_hash="${GATEWAY_HASH}" \
      --variable notification_svc_hash="${NOTIFICATION_HASH}" \
+     --variable camera_svc_hash="${CAMERA_HASH}" \
      -f /docker-entrypoint-initdb.d/sql/02-seed-auth.sql
 
 # Seed policy DB

@@ -6,6 +6,7 @@ WORKDIR /app
 COPY hearth-auth-common /hearth-auth-common
 RUN mvn -q -f /hearth-auth-common/pom.xml install -DskipTests
 
+COPY proto /proto
 COPY camera-orchestrator/pom.xml .
 
 RUN mvn dependency:go-offline -B # caching the dependencies on install
