@@ -394,6 +394,21 @@ spring:
                 hearth:
                   public: true
 
+            # Direct pass-through for rewritten URLs emitted by nas-orchestrator StreamingService
+            - id: nas-orchestrator-stream-playlist
+              uri: http://nas-orchestrator:9002
+              predicates: [Path=/api/v1/nas-orchestrator/stream/playlist, Method=GET]
+              metadata:
+                hearth:
+                  public: true
+
+            - id: nas-orchestrator-stream-segment
+              uri: http://nas-orchestrator:9002
+              predicates: [Path=/api/v1/nas-orchestrator/stream/segment, Method=GET]
+              metadata:
+                hearth:
+                  public: true
+
             # ─────────────────────────────────────────────
             # VIDEO SERVICE  (video-service:9004)
             # ─────────────────────────────────────────────
@@ -483,6 +498,280 @@ spring:
             - id: ws-notifications
               uri: ws://notification-service:9007
               predicates: [Path=/ws/notifications]
+              metadata:
+                hearth: { public: true }
+
+            # ─────────────────────────────────────────────
+            # CAMERA ORCHESTRATOR  (camera-orchestrator:9008)
+            # ─────────────────────────────────────────────
+
+            - id: camera-status
+              uri: http://camera-orchestrator:9008
+              predicates: [Path=/api/v1/camera/status, Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.read
+                  action: READ
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "camera"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-snapshot
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/snapshot", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.read
+                  action: READ
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-stream-url
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/stream-url", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.read
+                  action: READ
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-webrtc
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/webrtc", Method=POST]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.stream
+                  action: STREAM
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-live-media
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/stream,/api/v1/camera/{entityId}/live/**", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth: { public: true }
+
+            - id: camera-ptz
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/ptz", Method=POST]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.control
+                  action: CONTROL
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-record
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/record", Method=POST]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.control
+                  action: CONTROL
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-motion
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/{entityId}/motion", Method=POST]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.control
+                  action: CONTROL
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{entityId}"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-scan
+              uri: http://camera-orchestrator:9008
+              predicates: [Path=/api/v1/camera/scan, Method=POST]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.camera.control
+                  action: CONTROL
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "camera"
+                  qualifier: CAMERA
+                  namespace: OWN
+
+            - id: camera-recordings-read
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/recordings,/api/v1/camera/recordings/{recordingId}/download,/api/v1/camera/recordings/{recordingId}/preview", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.read
+                  action: READ
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-recordings-hls
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/recordings/{recordingId}/stream,/api/v1/camera/recordings/hls/**", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth: { public: true }
+
+            - id: camera-recordings-delete
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera/recordings/{recordingId}", Method=DELETE]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.delete
+                  action: DELETE
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-nas-list
+              uri: http://camera-orchestrator:9008
+              predicates: [Path=/api/v1/camera-nas/files, Method=GET]
+              filters:
+                - RewritePath=/api/v1/camera-nas/(?<seg>.*), /api/nas/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.list
+                  action: LIST
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-nas-read
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/camera-nas/preview,/api/v1/camera-nas/download", Method=GET]
+              filters:
+                - RewritePath=/api/v1/camera-nas/(?<seg>.*), /api/nas/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.read
+                  action: READ
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-nas-upload
+              uri: http://camera-orchestrator:9008
+              predicates: [Path=/api/v1/camera-nas/upload, Method=POST]
+              filters:
+                - RewritePath=/api/v1/camera-nas/(?<seg>.*), /api/nas/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.create
+                  action: CREATE
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-nas-delete
+              uri: http://camera-orchestrator:9008
+              predicates: [Path=/api/v1/camera-nas/files, Method=DELETE]
+              filters:
+                - RewritePath=/api/v1/camera-nas/(?<seg>.*), /api/nas/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.delete
+                  action: DELETE
+                  domain: NAS
+                  audience: camera-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-elements-read
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/devices/**,/api/v1/states/**,/api/v1/areas/**,/api/v1/automations/**,/api/v1/adapters/**,/api/v1/history/**", Method=GET]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.element.read
+                  action: READ
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: camera-elements-control
+              uri: http://camera-orchestrator:9008
+              predicates: ["Path=/api/v1/devices/**,/api/v1/states/**,/api/v1/services/**,/api/v1/areas/**,/api/v1/automations/**,/api/v1/adapters/**", "Method=POST,DELETE"]
+              filters:
+                - RewritePath=/api/v1/(?<seg>.*), /api/${seg}
+              metadata:
+                hearth:
+                  intent: element.element.control
+                  action: CONTROL
+                  domain: ELEMENT
+                  audience: camera-orchestrator
+                  resourceType: ELEMENT
+                  resourceId: "{username}"
+                  namespace: OWN
+
+            - id: ws-camera-states
+              uri: ws://camera-orchestrator:9008
+              predicates: [Path=/ws/states]
               metadata:
                 hearth: { public: true }
 

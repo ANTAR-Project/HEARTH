@@ -5,6 +5,7 @@ POSTGRES_USER="${POSTGRES_USER}"
 AUTH_DB_PASSWORD="${AUTH_DB_PASSWORD}"
 POLICY_DB_PASSWORD="${POLICY_DB_PASSWORD}"
 STREAMING_DB_PASSWORD="${STREAMING_DB_PASSWORD}"
+CAMERA_DB_PASSWORD="${CAMERA_DB_PASSWORD}"
 
 HEARTH_OWNER_USERNAME="${HEARTH_OWNER_USERNAME}"
 HEARTH_OWNER_PASSWORD="${HEARTH_OWNER_PASSWORD}"
@@ -14,6 +15,7 @@ ENCODING_SVC_SECRET="${ENCODING_SVC_SECRET}"
 STREAMING_SVC_SECRET="${STREAMING_SVC_SECRET}"
 GATEWAY_SVC_SECRET="${GATEWAY_SVC_SECRET}"
 NOTIFICATION_SVC_SECRET="${NOTIFICATION_SVC_SECRET}"
+CAMERA_SVC_SECRET="${CAMERA_SVC_SECRET}"
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
 
@@ -47,6 +49,16 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
   SELECT 'CREATE DATABASE antar_streaming OWNER antar_streaming'
   WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'antar_streaming') \gexec
 
+  -- camera-orchestrator DB
+  DO \$\$
+  BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'antar_camera') THEN
+      CREATE ROLE antar_camera WITH LOGIN PASSWORD '${CAMERA_DB_PASSWORD}';
+    END IF;
+  END \$\$;
+  SELECT 'CREATE DATABASE antar_camera OWNER antar_camera'
+  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'antar_camera') \gexec
+
 EOSQL
 
 # Ensure pgcrypto extension is installed in antar_auth once
@@ -74,6 +86,7 @@ ENCODING_HASH="$(hash_secret "$ENCODING_SVC_SECRET")"
 STREAMING_HASH="$(hash_secret "$STREAMING_SVC_SECRET")"
 GATEWAY_HASH="$(hash_secret "$GATEWAY_SVC_SECRET")"
 NOTIFICATION_HASH="$(hash_secret "$NOTIFICATION_SVC_SECRET")"
+CAMERA_HASH="$(hash_secret "$CAMERA_SVC_SECRET")"
 
 # Seed auth DB
 psql -v ON_ERROR_STOP=1 \
@@ -86,6 +99,7 @@ psql -v ON_ERROR_STOP=1 \
      --variable streaming_svc_hash="${STREAMING_HASH}" \
      --variable gateway_svc_hash="${GATEWAY_HASH}" \
      --variable notification_svc_hash="${NOTIFICATION_HASH}" \
+     --variable camera_svc_hash="${CAMERA_HASH}" \
      -f /docker-entrypoint-initdb.d/sql/02-seed-auth.sql
 
 # Seed policy DB

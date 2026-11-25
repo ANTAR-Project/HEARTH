@@ -3,6 +3,7 @@ package com.antar.cameraorchestrator.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.antar.cameraorchestrator.config.CameraConfig;
+import com.antar.cameraorchestrator.grpc.NasOrchestratorGrpcClient;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,14 +35,16 @@ public class NasStorageService {
     private static final Logger log = LoggerFactory.getLogger(NasStorageService.class);
 
     private final CameraConfig cameraConfig;
+    private final NasOrchestratorGrpcClient nasGrpcClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
     private final RestTemplate restTemplate;
 
-    public NasStorageService(CameraConfig cameraConfig) {
+    public NasStorageService(CameraConfig cameraConfig, NasOrchestratorGrpcClient nasGrpcClient) {
         this.cameraConfig = cameraConfig;
+        this.nasGrpcClient = nasGrpcClient;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(60_000);
         requestFactory.setReadTimeout(15 * 60_000);
@@ -88,7 +91,7 @@ public class NasStorageService {
                         item.put("sizeBytes", size);
                         item.put("formattedSize", formatFileSize(size));
                         item.put("isDirectory", isDir);
-                        item.put("lastModified", lastModified > 0 ? new java.util.Date(lastModified).toString() : "—");
+                        item.put("lastModified", lastModified > 0 ? new Date(lastModified).toString() : "—");
                         item.put("extension", ext);
                         item.put("fileType", fileType);
                         item.put("downloadUrl", "/api/nas/download?path=" + URLEncoder.encode(relativePath, StandardCharsets.UTF_8));
@@ -188,7 +191,7 @@ public class NasStorageService {
                             item.put("sizeBytes", size);
                             item.put("formattedSize", formatFileSize(size));
                             item.put("isDirectory", false);
-                            item.put("lastModified", lastMod > 0 ? new java.util.Date(lastMod).toString() : "—");
+                            item.put("lastModified", lastMod > 0 ? new Date(lastMod).toString() : "—");
                             item.put("extension", ext);
                             item.put("fileType", "video");
                             item.put("status", isEncoded ? "ENCODED" : "PROCESSING");
@@ -273,23 +276,14 @@ public class NasStorageService {
                 res.put("encoded", true);
                 return res;
             } else {
-                // Non-video files (images, PDFs, documents) -> Store directly in media/ folder
-                String uploadUrl = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/files/upload/file?path="
-                        + URLEncoder.encode(targetFolder, StandardCharsets.UTF_8);
-
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-                MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-                body.add("file", fileResource);
-
-                HttpEntity<MultiValueMap<String, Object>> requestEntity = new HttpEntity<>(body, headers);
-                restTemplate.postForEntity(uploadUrl, requestEntity, String.class);
+                // Non-video files (images, PDFs, documents) -> Upload via gRPC to nas-orchestrator
+                String destinationPath = targetFolder + "/" + finalFilename;
+                nasGrpcClient.uploadFile(destinationPath, tempFile);
 
                 Map<String, Object> res = new HashMap<>();
                 res.put("status", "success");
                 res.put("message", "File uploaded successfully to TrueNAS vault in " + targetFolder);
-                res.put("path", targetFolder + "/" + finalFilename);
+                res.put("path", destinationPath);
                 res.put("encoded", false);
                 return res;
             }
@@ -338,28 +332,21 @@ public class NasStorageService {
     }
 
     /**
-     * Proxies inline preview for images, PDFs, text, and videos with proper MIME type.
+     * Proxies inline preview for images, PDFs, text, and videos with proper MIME type via gRPC.
      */
     public void previewFile(String path, HttpServletResponse response) throws IOException {
         String filename = path.contains("/") ? path.substring(path.lastIndexOf('/') + 1) : path;
         String ext = getExtension(filename);
         String contentType = resolveContentType(ext);
-
-        String url = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/files/download?path="
-                + URLEncoder.encode(path, StandardCharsets.UTF_8);
-
-        forwardStream(url, response, contentType, "inline; filename=\"" + filename + "\"");
+        nasGrpcClient.downloadToResponse(path, response, contentType, "inline; filename=\"" + filename + "\"");
     }
 
     /**
-     * Proxies attachment download for files.
+     * Proxies attachment download for files via gRPC.
      */
     public void downloadFile(String path, HttpServletResponse response) throws IOException {
         String filename = path.contains("/") ? path.substring(path.lastIndexOf('/') + 1) : path;
-        String url = cameraConfig.getNasOrchestratorUrl() + "/api/v1/nas-orchestrator/files/download?path="
-                + URLEncoder.encode(path, StandardCharsets.UTF_8);
-
-        forwardStream(url, response, MediaType.APPLICATION_OCTET_STREAM_VALUE, "attachment; filename=\"" + filename + "\"");
+        nasGrpcClient.downloadToResponse(path, response, MediaType.APPLICATION_OCTET_STREAM_VALUE, "attachment; filename=\"" + filename + "\"");
     }
 
     private void forwardStream(String sourceUrl, HttpServletResponse response, String contentType, String contentDisposition) throws IOException {

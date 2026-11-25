@@ -23,7 +23,7 @@ public class EntityStateEntity {
     @Column(name = "domain", length = 32, nullable = false)
     private String domain; // e.g. 'light', 'switch', 'sensor'
 
-    @Column(name = "current_state", length = 64, nullable = false)
+    @Column(name = "current_state", length = 128, nullable = false)
     private String currentState; // e.g. 'ON', 'OFF', '23.5', 'unavailable'
 
     @Column(name = "attributes_json", columnDefinition = "TEXT")

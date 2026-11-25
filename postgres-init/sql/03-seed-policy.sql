@@ -67,7 +67,12 @@ VALUES ('nas.workspace.list', 'NAS', 'OWNER', 'LIST', 'WORKSPACE', NULL, 'OWN', 
        ('user.account.create', 'USER', 'OWNER', 'CREATE', 'ACCOUNT', 'RESIDENT', 'ANY', 'ALLOW', '{}', 0),
        ('user.account.delete', 'USER', 'OWNER', 'DELETE', 'ACCOUNT', 'RESIDENT', 'ANY', 'ALLOW', '{}', 0),
        ('user.account.create', 'USER', 'OWNER', 'CREATE', 'ACCOUNT', 'GUEST', 'ANY', 'ALLOW', '{}', 0),
-       ('user.account.delete', 'USER', 'OWNER', 'DELETE', 'ACCOUNT', 'GUEST', 'ANY', 'ALLOW', '{}', 0);
+       ('user.account.delete', 'USER', 'OWNER', 'DELETE', 'ACCOUNT', 'GUEST', 'ANY', 'ALLOW', '{}', 0),
+       ('element.element.read', 'ELEMENT', 'OWNER', 'READ', 'ELEMENT', NULL, 'OWN', 'ALLOW', '{}', 0),
+       ('element.element.control', 'ELEMENT', 'OWNER', 'CONTROL', 'ELEMENT', NULL, 'OWN', 'ALLOW', '{}', 0),
+       ('element.camera.read', 'ELEMENT', 'OWNER', 'READ', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0),
+       ('element.camera.control', 'ELEMENT', 'OWNER', 'CONTROL', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0),
+       ('element.camera.stream', 'ELEMENT', 'OWNER', 'STREAM', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0);
 
 -- ── RESIDENT: 22 rows (16 ALLOW, 6 DENY) ──────────────────────────────
 INSERT INTO policy_rules (rule_name, domain, role, action, resource_type, resource_qualifier, scope, effect, conditions, priority)
@@ -92,7 +97,12 @@ VALUES ('nas.workspace.list', 'NAS', 'RESIDENT', 'LIST', 'WORKSPACE', NULL, 'OWN
        ('nas.workspace.read', 'NAS', 'RESIDENT', 'READ', 'WORKSPACE', 'GUEST', 'ANY', 'DENY', '{}', 100),
        ('nas.workspace.create', 'NAS', 'RESIDENT', 'CREATE', 'WORKSPACE', 'GUEST', 'ANY', 'DENY', '{}', 100),
        ('nas.workspace.update', 'NAS', 'RESIDENT', 'UPDATE', 'WORKSPACE', 'GUEST', 'ANY', 'DENY', '{}', 100),
-       ('nas.workspace.delete', 'NAS', 'RESIDENT', 'DELETE', 'WORKSPACE', 'GUEST', 'ANY', 'DENY', '{}', 100);
+       ('nas.workspace.delete', 'NAS', 'RESIDENT', 'DELETE', 'WORKSPACE', 'GUEST', 'ANY', 'DENY', '{}', 100),
+       ('element.element.read', 'ELEMENT', 'RESIDENT', 'READ', 'ELEMENT', NULL, 'OWN', 'ALLOW', '{}', 0),
+       ('element.element.control', 'ELEMENT', 'RESIDENT', 'CONTROL', 'ELEMENT', NULL, 'OWN', 'ALLOW', '{}', 0),
+       ('element.camera.read', 'ELEMENT', 'RESIDENT', 'READ', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0),
+       ('element.camera.control', 'ELEMENT', 'RESIDENT', 'CONTROL', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0),
+       ('element.camera.stream', 'ELEMENT', 'RESIDENT', 'STREAM', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0);
 
 -- ── GUEST: 15 rows (10 ALLOW, 5 DENY) ──────────────────────────────
 INSERT INTO policy_rules (rule_name, domain, role, action, resource_type, resource_qualifier, scope, effect, conditions, priority)
@@ -110,7 +120,11 @@ VALUES ('nas.workspace.list', 'NAS', 'GUEST', 'LIST', 'WORKSPACE', NULL, 'OWN', 
        ('user.account.create', 'USER', 'GUEST', 'CREATE', 'ACCOUNT', 'RESIDENT', 'ANY', 'DENY', '{}', 100),
        ('user.account.delete', 'USER', 'GUEST', 'DELETE', 'ACCOUNT', 'RESIDENT', 'ANY', 'DENY', '{}', 100),
        ('user.account.create', 'USER', 'GUEST', 'CREATE', 'ACCOUNT', 'GUEST', 'ANY', 'DENY', '{}', 100),
-       ('user.account.delete', 'USER', 'GUEST', 'DELETE', 'ACCOUNT', 'GUEST', 'ANY', 'DENY', '{}', 100);
+       ('user.account.delete', 'USER', 'GUEST', 'DELETE', 'ACCOUNT', 'GUEST', 'ANY', 'DENY', '{}', 100),
+       ('element.element.read', 'ELEMENT', 'GUEST', 'READ', 'ELEMENT', NULL, 'OWN', 'ALLOW', '{}', 0),
+       ('element.camera.read', 'ELEMENT', 'GUEST', 'READ', 'ELEMENT', 'CAMERA', 'ANY', 'ALLOW', '{}', 0),
+       ('element.camera.control', 'ELEMENT', 'GUEST', 'CONTROL', 'ELEMENT', 'CAMERA', 'ANY', 'DENY', '{}', 100),
+       ('element.camera.stream', 'ELEMENT', 'GUEST', 'STREAM', 'ELEMENT', 'CAMERA', 'ANY', 'DENY', '{}', 100);
 
 -- ── SERVICE: 10 rows (10 ALLOW, 0 DENY) ──────────────────────────────
 INSERT INTO policy_rules (rule_name, domain, role, action, resource_type, resource_qualifier, scope, effect, conditions, priority)

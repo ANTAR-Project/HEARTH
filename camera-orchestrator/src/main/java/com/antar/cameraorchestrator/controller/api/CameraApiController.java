@@ -211,23 +211,23 @@ public class CameraApiController {
     @GetMapping(value = "/{entityId}/stream")
     public void streamLiveVideo(@PathVariable String entityId,
                                 jakarta.servlet.http.HttpServletRequest request,
-                                jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+                                jakarta.servlet.http.HttpServletResponse response) throws IOException {
         String deviceId = resolveDeviceId(entityId);
         String streamName = cameraAdapterService.resolveStreamName(entityId);
         cameraAdapterService.ensureCameraStreamRegistered(entityId);
 
         response.setContentType("multipart/x-mixed-replace; boundary=--frame");
-        java.io.OutputStream out = response.getOutputStream();
+        OutputStream out = response.getOutputStream();
 
         // 1. Try proxying high-fps stream from local go2rtc instance
         try {
             String go2rtcBase = cameraConfig.getGo2rtcUrl() != null ? cameraConfig.getGo2rtcUrl() : "http://localhost:1984";
-            java.net.URI uri = java.net.URI.create(go2rtcBase + "/api/stream.mjpeg?src=" + java.net.URLEncoder.encode(streamName, java.nio.charset.StandardCharsets.UTF_8));
-            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) uri.toURL().openConnection();
+            URI uri = URI.create(go2rtcBase + "/api/stream.mjpeg?src=" + java.net.URLEncoder.encode(streamName, java.nio.charset.StandardCharsets.UTF_8));
+            HttpURLConnection conn = (HttpURLConnection) uri.toURL().openConnection();
             conn.setConnectTimeout(2000);
             conn.setReadTimeout(10000);
             if (conn.getResponseCode() == 200) {
-                try (java.io.InputStream in = conn.getInputStream()) {
+                try (InputStream in = conn.getInputStream()) {
                     byte[] buffer = new byte[16384];
                     int bytesRead;
                     while ((bytesRead = in.read(buffer)) != -1) {
@@ -268,7 +268,7 @@ public class CameraApiController {
     })
     public void streamMp4Video(@PathVariable String entityId,
                                jakarta.servlet.http.HttpServletRequest request,
-                               jakarta.servlet.http.HttpServletResponse response) throws java.io.IOException {
+                               jakarta.servlet.http.HttpServletResponse response) throws IOException {
         cameraAdapterService.ensureCameraStreamRegistered(entityId);
         String streamName = cameraAdapterService.resolveStreamName(entityId);
         String go2rtcBase = cameraConfig.getGo2rtcUrl() != null ? cameraConfig.getGo2rtcUrl() : "http://localhost:1984";
@@ -331,7 +331,7 @@ public class CameraApiController {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(10000);
 
-            try (java.io.OutputStream os = conn.getOutputStream()) {
+            try (OutputStream os = conn.getOutputStream()) {
                 os.write(offerBytes);
             }
 

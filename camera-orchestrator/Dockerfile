@@ -1,23 +1,29 @@
-# BUILD STAGE - Maven + Eclipse Temurin 21
+# BUILD TOOL - maven
 FROM maven:3.9.9-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
-COPY pom.xml .
-RUN mvn dependency:go-offline -B
+COPY hearth-auth-common /hearth-auth-common
+RUN mvn -q -f /hearth-auth-common/pom.xml install -DskipTests
 
-COPY src ./src
-RUN mvn clean package -DskipTests
+COPY proto /proto
+COPY camera-orchestrator/pom.xml .
 
-# RUNTIME STAGE - Eclipse Temurin 21 JDK + FFmpeg
+RUN mvn dependency:go-offline -B # caching the dependencies on install
+
+COPY camera-orchestrator/src ./src
+
+RUN mvn clean package -DskipTests # packaging the code into .jar
+
+# RUNTIME - JDK
 FROM eclipse-temurin:21-jdk AS runner
 
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder /app/target/camera-orchestrator-0.0.1-SNAPSHOT.jar ./app.jar
+COPY --from=builder ./app/target/camera-orchestrator-0.0.1-SNAPSHOT.jar ./app.jar
 
-EXPOSE 8080
+EXPOSE 9008
 
-ENTRYPOINT ["java", "-Xms256m", "-Xmx1024m", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-Xms256m", "-Xmx512m", "-jar", "app.jar"]

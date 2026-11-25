@@ -156,7 +156,7 @@ public class CameraAdapterService implements ProtocolAdapter {
         }
     }
 
-    public java.util.concurrent.CompletableFuture<com.antar.cameraorchestrator.model.dto.RecordingItemDto> recordClip(String deviceId, int durationSeconds) {
+    public CompletableFuture<com.antar.cameraorchestrator.model.dto.RecordingItemDto> recordClip(String deviceId, int durationSeconds) {
         return cameraRecordingService.recordAndUploadToTrueNas(deviceId, durationSeconds);
     }
 
