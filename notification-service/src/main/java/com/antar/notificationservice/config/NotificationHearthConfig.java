@@ -24,6 +24,6 @@ public class NotificationHearthConfig {
     ) throws Exception {
         DiskBackedJwkSource src = new DiskBackedJwkSource(new URL(jwksUri), "hearth-auth");
         return new JwtVerifier(src,
-            new JwtVerifier.Spec(Hearth.TYP_ACCESS, Hearth.ISS_AUTH, null, Duration.ofSeconds(10)));
+            new JwtVerifier.Spec(Hearth.TYP_ACCESS, Hearth.ISS_AUTH, Hearth.ISS_GATEWAY, Duration.ofSeconds(10)));
     }
 }

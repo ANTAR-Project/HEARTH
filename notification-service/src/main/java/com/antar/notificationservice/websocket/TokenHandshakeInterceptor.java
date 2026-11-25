@@ -52,7 +52,7 @@ public class TokenHandshakeInterceptor implements HandshakeInterceptor {
             attributes.put("username", username);
             return true;
         } catch (JwtVerifier.Rejected e) {
-            log.warn("WebSocket handshake rejected — invalid access token");
+            log.warn("WebSocket handshake rejected — invalid access token ({})", e.getMessage());
             response.setStatusCode(HttpStatus.UNAUTHORIZED);
             return false;
         } catch (JwtVerifier.Unavailable e) {

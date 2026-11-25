@@ -23,6 +23,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(notificationWebSocketHandler, "/ws/notifications")
             .addInterceptors(tokenHandshakeInterceptor)
-            .setAllowedOrigins(allowedOrigins.split(","));
+            .setAllowedOriginPatterns(allowedOrigins.split(","));
     }
 }
