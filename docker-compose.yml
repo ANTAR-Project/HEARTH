@@ -279,8 +279,8 @@ services:
   # camera-orchestrator
   camera-orchestrator:
     build:
-      context: camera-orchestrator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: camera-orchestrator/Dockerfile
     container_name: camera-orchestrator
     env_file:
       - ./camera-orchestrator/.env
