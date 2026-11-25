@@ -41,6 +41,8 @@ public class ServiceTokenRefresher {
 
     private final AtomicReference<String> currentToken = new AtomicReference<String>();
     private volatile Instant refreshAt = Instant.MIN;
+    private volatile Instant tokenExpiresAt = Instant.MIN;  // absolute expiry of the held token
+    private static final long EXPIRY_GUARD_SECONDS = 90;    // refuse to hand out a token within 90 s of expiry
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper json = new ObjectMapper();
 
@@ -84,6 +86,7 @@ public class ServiceTokenRefresher {
 
             long expiresIn = node.has("expiresIn") ? node.get("expiresIn").asLong(600) : (node.has("expires_in") ? node.get("expires_in").asLong(600) : 600);
             refreshAt = Instant.now().plusSeconds(expiresIn - 60);
+            tokenExpiresAt = Instant.now().plusSeconds(expiresIn);
 
             log.info("Service token refreshed for {}", clientId);
         } catch (Exception e) {
@@ -93,6 +96,14 @@ public class ServiceTokenRefresher {
 
     public String get() {
         String token = currentToken.get();
+
+        // If the token is expiring soon (within EXPIRY_GUARD_SECONDS), force an immediate
+        // synchronous refresh before handing it to a caller starting a potentially long operation.
+        if (token != null && Instant.now().isAfter(tokenExpiresAt.minusSeconds(EXPIRY_GUARD_SECONDS))) {
+            log.info("Service token within {}s of expiry — forcing proactive refresh", EXPIRY_GUARD_SECONDS);
+            refresh();
+            token = currentToken.get();
+        }
 
         if (token == null) {
             long deadline = System.currentTimeMillis() + 15_000;

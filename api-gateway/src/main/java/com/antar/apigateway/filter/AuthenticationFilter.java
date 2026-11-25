@@ -47,11 +47,23 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
             .getHeaders()
             .getFirst(HttpHeaders.AUTHORIZATION);
 
-        if (auth == null || !auth.startsWith("Bearer "))
+        String rawToken = null;
+        if (auth != null && auth.startsWith("Bearer ")) {
+            rawToken = auth.substring(7);
+        } else {
+            // Support query param token (e.g. HLS media players, SSE, WebSockets)
+            String queryToken = ex.getRequest().getQueryParams().getFirst("token");
+            if (queryToken != null && !queryToken.isBlank()) {
+                rawToken = queryToken;
+            }
+        }
+
+        if (rawToken == null)
             return audit.authRejected(ex, "AUTH_INVALID")
                 .then(Problems.write(ex, 401, "AUTH_INVALID"));
 
-        return Mono.fromCallable(() -> accessVerifier.verify(auth.substring(7)))
+        final String tokenToVerify = rawToken;
+        return Mono.fromCallable(() -> accessVerifier.verify(tokenToVerify))
             .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
             .onErrorResume(JwtVerifier.Rejected.class, e -> {
                 log.warn("JWT verification rejected: reason='{}', path='{}'", e.getMessage(), ex.getRequest().getPath().value());

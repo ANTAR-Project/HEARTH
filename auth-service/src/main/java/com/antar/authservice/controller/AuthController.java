@@ -1,13 +1,11 @@
 package com.antar.authservice.controller;
 
-import com.antar.authservice.config.AuthKeys;
 import com.antar.authservice.dto.*;
+import com.antar.authservice.hearth.HearthPrincipal;
 import com.antar.authservice.model.User;
 import com.antar.authservice.repository.UserRepository;
 import com.antar.authservice.service.SessionService;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
-import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,18 +22,15 @@ public class AuthController {
     private final UserRepository users;
     private final SessionService sessions;
     private final PasswordEncoder encoder;
-    private final AuthKeys authKeys;
 
     public AuthController(
         UserRepository users,
         SessionService sessions,
-        PasswordEncoder encoder,
-        AuthKeys authKeys
+        PasswordEncoder encoder
     ) {
         this.users = users;
         this.sessions = sessions;
         this.encoder = encoder;
-        this.authKeys = authKeys;
     }
 
     @PostMapping("/login")
@@ -74,14 +68,16 @@ public class AuthController {
 
     /**
      * Endpoint where an OWNER can create a RESIDENT or GUEST user.
-     * Enforces caller has role == OWNER via Authorization Bearer token.
+     * Authorization is enforced by the gateway (policy check + context token).
+     * The ContextTokenFilter has already verified the token and stored HearthPrincipal;
+     * we just assert the role claim as a defence-in-depth check.
      */
     @PostMapping("/users")
     public ResponseEntity<UserResponse> createUser(
-        @RequestHeader(value = "Authorization", required = false) String authHeader,
+        HttpServletRequest request,
         @Valid @RequestBody CreateUserRequest req
     ) {
-        assertOwner(authHeader);
+        assertOwner(request);
 
         if (req.role() == User.UserRole.OWNER) {
             throw new AuthException("CANNOT_CREATE_OWNER_ROLE", 400);
@@ -105,45 +101,30 @@ public class AuthController {
 
     /**
      * Endpoint for an OWNER to list all registered users.
+     * Authorization is enforced by the gateway (policy check + context token).
      */
     @GetMapping("/users")
-    public ResponseEntity<List<UserResponse>> listUsers(
-        @RequestHeader(value = "Authorization", required = false) String authHeader
-    ) {
-        assertOwner(authHeader);
+    public ResponseEntity<List<UserResponse>> listUsers(HttpServletRequest request) {
+        assertOwner(request);
         List<UserResponse> list = users.findAll().stream()
             .map(UserResponse::from)
             .toList();
         return ResponseEntity.ok(list);
     }
 
-    private void assertOwner(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+    /**
+     * Defence-in-depth role check: the ContextTokenFilter has already verified the
+     * gateway-signed context token and stored the HearthPrincipal as a request attribute.
+     * We re-assert OWNER here so a misconfigured route can never reach this controller
+     * without an authenticated OWNER principal.
+     */
+    private void assertOwner(HttpServletRequest request) {
+        HearthPrincipal principal = (HearthPrincipal) request.getAttribute(HearthPrincipal.ATTR);
+        if (principal == null) {
             throw new AuthException("UNAUTHORIZED", 401);
         }
-        String token = authHeader.substring(7).trim();
-        try {
-            SignedJWT jwt = SignedJWT.parse(token);
-            String kid = jwt.getHeader().getKeyID();
-            var key = authKeys.getKey(kid);
-            if (key == null || !jwt.verify(new ECDSAVerifier(key.toECPublicKey()))) {
-                throw new AuthException("INVALID_TOKEN", 401);
-            }
-
-            JWTClaimsSet claims = jwt.getJWTClaimsSet();
-            Date exp = claims.getExpirationTime();
-            if (exp != null && exp.before(new Date())) {
-                throw new AuthException("TOKEN_EXPIRED", 401);
-            }
-
-            String role = claims.getStringClaim("role");
-            if (!"OWNER".equals(role)) {
-                throw new AuthException("FORBIDDEN_OWNER_REQUIRED", 403);
-            }
-        } catch (AuthException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new AuthException("INVALID_TOKEN: " + e.getMessage(), 401);
+        if (!"OWNER".equals(principal.role())) {
+            throw new AuthException("FORBIDDEN_OWNER_REQUIRED", 403);
         }
     }
 

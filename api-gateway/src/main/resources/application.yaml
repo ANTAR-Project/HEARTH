@@ -372,10 +372,9 @@ spring:
                   namespace: OWN
 
             # ── HLS streaming (/api/v1/nas/stream/…) ────────────────────────────
-            # Treated as WORKSPACE READs from the caller's OWN workspace.
-            # The token-signed URL is still verified by StreamingController,
-            # but the gateway now also enforces WORKSPACE / READ / OWN policy
-            # so a revoked or mismatched role is blocked before it reaches the service.
+            # Media player clients (Video.js, hls.js, native Safari) fetch playlists
+            # and .ts segments using query param URLs (?token=...), not Authorization headers.
+            # Gateway passes through (public: true); nas-orchestrator handles streaming.
 
             - id: nas-stream-playlist
               uri: http://nas-orchestrator:9002
@@ -384,13 +383,7 @@ spring:
                 - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.workspace.read
-                  action: READ
-                  domain: NAS
-                  audience: nas-orchestrator
-                  resourceType: WORKSPACE
-                  resourceId: "{username}"
-                  namespace: OWN
+                  public: true
 
             - id: nas-stream-segment
               uri: http://nas-orchestrator:9002
@@ -399,13 +392,7 @@ spring:
                 - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
               metadata:
                 hearth:
-                  intent: nas.workspace.read
-                  action: READ
-                  domain: NAS
-                  audience: nas-orchestrator
-                  resourceType: WORKSPACE
-                  resourceId: "{username}"
-                  namespace: OWN
+                  public: true
 
             # ─────────────────────────────────────────────
             # VIDEO SERVICE  (video-service:9004)
