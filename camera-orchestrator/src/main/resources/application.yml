@@ -19,9 +19,9 @@ spring:
       location: /tmp
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:homeassistant}
-    username: ${DB_USER:ha_app}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:antar_camera}
+    username: ${DB_USER:antar_camera}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -69,16 +69,16 @@ mqtt:
 # Camera Adapter Configuration (VLAN 30)
 camera:
   enabled: ${CAMERA_ENABLED:true}
-  default-ip: ${CAMERA_DEFAULT_IP}
+  default-ip: ${CAMERA_DEFAULT_IP:192.168.30.247}
   rtsp-port: ${CAMERA_RTSP_PORT:5543}
   http-port: ${CAMERA_HTTP_PORT:8000}
   username: ${CAMERA_USERNAME:admin}
-  password: ${CAMERA_PASSWORD}
+  password: ${CAMERA_PASSWORD:}
   substream-path: "/live/channel1"
   mainstream-path: "/live/channel0"
   snapshot-path: "/cgi-bin/snapshot.cgi?channel=1"
   poll-interval-ms: 15000
-  subnet: ${CAMERA_SUBNET}
+  subnet: ${CAMERA_SUBNET:192.168.30.0/24}
   motion-reset-seconds: 15
   go2rtc-url: ${GO2RTC_URL:http://go2rtc:1984}
   onvif-profile-token: ${CAMERA_ONVIF_PROFILE:PROFILE_1676656330}

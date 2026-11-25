@@ -5,6 +5,7 @@ POSTGRES_USER="${POSTGRES_USER}"
 AUTH_DB_PASSWORD="${AUTH_DB_PASSWORD}"
 POLICY_DB_PASSWORD="${POLICY_DB_PASSWORD}"
 STREAMING_DB_PASSWORD="${STREAMING_DB_PASSWORD}"
+CAMERA_DB_PASSWORD="${CAMERA_DB_PASSWORD}"
 
 HEARTH_OWNER_USERNAME="${HEARTH_OWNER_USERNAME}"
 HEARTH_OWNER_PASSWORD="${HEARTH_OWNER_PASSWORD}"
@@ -46,6 +47,16 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
   END \$\$;
   SELECT 'CREATE DATABASE antar_streaming OWNER antar_streaming'
   WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'antar_streaming') \gexec
+
+  -- camera-orchestrator DB
+  DO \$\$
+  BEGIN
+    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'antar_camera') THEN
+      CREATE ROLE antar_camera WITH LOGIN PASSWORD '${CAMERA_DB_PASSWORD}';
+    END IF;
+  END \$\$;
+  SELECT 'CREATE DATABASE antar_camera OWNER antar_camera'
+  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'antar_camera') \gexec
 
 EOSQL
 

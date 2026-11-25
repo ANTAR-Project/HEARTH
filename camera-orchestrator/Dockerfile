@@ -11,7 +11,6 @@ COPY camera-orchestrator/pom.xml .
 RUN mvn dependency:go-offline -B # caching the dependencies on install
 
 COPY camera-orchestrator/src ./src
-COPY proto /proto
 
 RUN mvn clean package -DskipTests # packaging the code into .jar
 
