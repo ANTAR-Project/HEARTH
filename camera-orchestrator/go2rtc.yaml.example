@@ -1,5 +1,6 @@
 # ============================================================
 # go2rtc configuration TEMPLATE
+# Container: go2rtc (accessible as http://go2rtc:1984 on hearth-internal)
 # Copy this to go2rtc.yaml and set your real values in .env
 # !! go2rtc.yaml is gitignored — NEVER commit it !!
 # ============================================================

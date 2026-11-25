@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:9008}
   tomcat:
     max-swallow-size: -1
     max-http-form-post-size: 2GB
@@ -19,7 +19,7 @@ spring:
       location: /tmp
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:homeassistant}
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:homeassistant}
     username: ${DB_USER:ha_app}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
@@ -55,7 +55,7 @@ spring:
 # MQTT Broker Configuration
 mqtt:
   enabled: ${MQTT_ENABLED:true}
-  broker-url: tcp://${MQTT_HOST:localhost}:${MQTT_PORT:1883}
+  broker-url: tcp://${MQTT_HOST:mosquitto}:${MQTT_PORT:1883}
   client-id: ${MQTT_CLIENT_ID:ha_backend_server}
   username: ${MQTT_USERNAME:ha_app}
   password: ${MQTT_PASSWORD}
@@ -80,11 +80,11 @@ camera:
   poll-interval-ms: 15000
   subnet: ${CAMERA_SUBNET}
   motion-reset-seconds: 15
-  go2rtc-url: ${GO2RTC_URL:http://localhost:1984}
+  go2rtc-url: ${GO2RTC_URL:http://go2rtc:1984}
   onvif-profile-token: ${CAMERA_ONVIF_PROFILE:PROFILE_1676656330}
-  video-service-url: ${VIDEO_SERVICE_URL:http://localhost:8082}
-  nas-orchestrator-url: ${NAS_ORCHESTRATOR_URL:http://localhost:8081}
-  streaming-service-url: ${STREAMING_SERVICE_URL:http://localhost:8084}
+  video-service-url: ${VIDEO_SERVICE_URL:http://video-service:9004}
+  nas-orchestrator-url: ${NAS_ORCHESTRATOR_URL:http://nas-orchestrator:9002}
+  streaming-service-url: ${STREAMING_SERVICE_URL:http://streaming-service:9006}
 
 # BLE Adapter Configuration
 ble:

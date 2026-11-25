@@ -88,7 +88,7 @@ public class NasStorageService {
                         item.put("sizeBytes", size);
                         item.put("formattedSize", formatFileSize(size));
                         item.put("isDirectory", isDir);
-                        item.put("lastModified", lastModified > 0 ? new java.util.Date(lastModified).toString() : "—");
+                        item.put("lastModified", lastModified > 0 ? new Date(lastModified).toString() : "—");
                         item.put("extension", ext);
                         item.put("fileType", fileType);
                         item.put("downloadUrl", "/api/nas/download?path=" + URLEncoder.encode(relativePath, StandardCharsets.UTF_8));
@@ -188,7 +188,7 @@ public class NasStorageService {
                             item.put("sizeBytes", size);
                             item.put("formattedSize", formatFileSize(size));
                             item.put("isDirectory", false);
-                            item.put("lastModified", lastMod > 0 ? new java.util.Date(lastMod).toString() : "—");
+                            item.put("lastModified", lastMod > 0 ? new Date(lastMod).toString() : "—");
                             item.put("extension", ext);
                             item.put("fileType", "video");
                             item.put("status", isEncoded ? "ENCODED" : "PROCESSING");

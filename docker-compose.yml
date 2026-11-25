@@ -83,6 +83,38 @@ services:
     networks: [hearth-internal]
 
   # ─────────────────────────────────────────
+  # MOSQUITTO
+  # ─────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    volumes:
+      - ./camera-orchestrator/mosquitto/config:/mosquitto/config
+      - ./camera-orchestrator/mosquitto/data:/mosquitto/data
+      - ./camera-orchestrator/mosquitto/log:/mosquitto/log
+    ports:
+      - "1883:1883"
+      - "9100:9100"
+    networks: [hearth-internal]
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # GO2RTC
+  # ─────────────────────────────────────────
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    volumes:
+      - ./camera-orchestrator/go2rtc.yaml:/config/go2rtc.yaml
+    ports:
+      - "1984:1984"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    networks: [hearth-internal]
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
   # MICROSERVICES
   # ─────────────────────────────────────────
 
@@ -243,6 +275,26 @@ services:
       auth-service:
         condition: service_started
     networks: [hearth-internal]
+
+  # camera-orchestrator
+  camera-orchestrator:
+    build:
+      context: camera-orchestrator
+      dockerfile: Dockerfile
+    container_name: camera-orchestrator
+    env_file:
+      - ./camera-orchestrator/.env
+    ports:
+      - "9008:9008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+      go2rtc:
+        condition: service_started
+    networks: [hearth-internal]
+    restart: unless-stopped
 
 networks:
   hearth-internal:
