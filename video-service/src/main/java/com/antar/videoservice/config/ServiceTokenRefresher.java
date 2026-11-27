@@ -1,0 +1,132 @@
+package com.antar.videoservice.config;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+@Component
+public class ServiceTokenRefresher {
+    private static final Logger log = LoggerFactory.getLogger(ServiceTokenRefresher.class);
+
+    @Value("${auth.service.url}")
+    private String authUrl;
+
+    @Value("${auth.client.id}")
+    private String clientId;
+
+    @Value("${auth.client.secret}")
+    private String clientSecret;
+
+    @Value("${auth.client.audience}")
+    private String audience;
+
+    @Value("${auth.client.scope}")
+    private String scope;
+
+    private final AtomicReference<String> currentToken = new AtomicReference<String>();
+    private volatile Instant refreshAt = Instant.MIN;
+    private volatile Instant tokenExpiresAt = Instant.MIN;  // absolute expiry of the held token
+    private static final long EXPIRY_GUARD_SECONDS = 90;    // refuse to hand out a token within 90 s of expiry
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper json = new ObjectMapper();
+
+    @PostConstruct
+    public void init() {
+        refresh();
+    }
+
+    @Scheduled(fixedDelay = 10_000)
+    public void maybeRefresh() {
+        if (Instant.now().isAfter(refreshAt)) {
+            refresh();
+        }
+    }
+
+    private synchronized void refresh() {
+        try {
+            String body = "grant_type=client_credentials"
+                + "&client_id=" + URLEncoder.encode(clientId, UTF_8)
+                + "&client_secret=" + URLEncoder.encode(clientSecret, UTF_8)
+                + "&audience=" + URLEncoder.encode(audience, UTF_8)
+                + "&scope=" + URLEncoder.encode(scope, UTF_8);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(authUrl + "/oauth/token"))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.error("Service token refresh failed with status {}: {}", response.statusCode(), response.body());
+                return;
+            }
+
+            JsonNode node = json.readTree(response.body());
+            JsonNode tokenNode = node.has("accessToken") ? node.get("accessToken") : node.get("access_token");
+            if (tokenNode != null) {
+                currentToken.set(tokenNode.asText());
+            }
+
+            long expiresIn = node.has("expiresIn") ? node.get("expiresIn").asLong(600) : (node.has("expires_in") ? node.get("expires_in").asLong(600) : 600);
+            refreshAt = Instant.now().plusSeconds(expiresIn - 60);
+            tokenExpiresAt = Instant.now().plusSeconds(expiresIn);
+
+            log.info("Service token refreshed for {}", clientId);
+        } catch (Exception e) {
+            log.error("Service token refresh failed: {}", e.getMessage());
+        }
+    }
+
+    public String get() {
+        String token = currentToken.get();
+
+        // If the token is expiring soon (within EXPIRY_GUARD_SECONDS), force an immediate
+        // synchronous refresh before handing it to a caller starting a potentially long
+        // operation (e.g. a large gRPC upload stream that could outlive the token).
+        if (token != null && Instant.now().isAfter(tokenExpiresAt.minusSeconds(EXPIRY_GUARD_SECONDS))) {
+            log.info("Service token within {}s of expiry — forcing proactive refresh", EXPIRY_GUARD_SECONDS);
+            refresh();
+            token = currentToken.get();
+        }
+
+        // Token may be null if auth-service was not ready at startup.
+        // Block-retry for up to 15 s so the first real request doesn't fail
+        // while the @Scheduled refresh catches up.
+        if (token == null) {
+            long deadline = System.currentTimeMillis() + 15_000;
+            while (token == null && System.currentTimeMillis() < deadline) {
+                refresh();                      // force immediate retry
+                token = currentToken.get();
+                if (token == null) {
+                    try { Thread.sleep(1_000); } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (token == null) {
+            throw new IllegalStateException("No service token available — auth-service may be unreachable");
+        }
+
+        return token;
+    }
+}

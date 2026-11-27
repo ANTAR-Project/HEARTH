@@ -1,0 +1,10 @@
+# Generate the real passwd file with mosquitto_passwd:
+#
+#   # Create new file with first user:
+#   mosquitto_passwd -c passwd ha_app
+#
+#   # Add additional users:
+#   mosquitto_passwd passwd esp32_relay1
+#   mosquitto_passwd passwd esp32_sensor1
+#
+# The passwd file is gitignored — keep it only on the host running Mosquitto.

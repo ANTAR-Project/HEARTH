@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: notification-service
+  config:
+    import: optional:file:.env[.properties]
+  kafka:
+    bootstrap-servers: kafka:29092
+    consumer:
+      group-id: notification-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring:
+          json:
+            trusted:
+              packages: "*"
+            use:
+              type:
+                headers: false
+            value:
+              default:
+                type: com.antar.notificationservice.event.PlaylistReadyEvent
+
+server:
+  port: 9007
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://auth-service:9000}
+  client:
+    id: ${AUTH_CLIENT_ID}
+    secret: ${AUTH_CLIENT_SECRET}
+    audience: ${AUTH_CLIENT_AUDIENCE}
+    scope: ${AUTH_CLIENT_SCOPE}
+
+hearth:
+  auth:
+    jwks-uri: http://auth-service:9000/.well-known/jwks.json
+
+notification:
+  ws:
+    allowed-origins: ${WS_ALLOWED_ORIGINS}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info

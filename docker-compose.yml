@@ -1,24 +1,150 @@
-name: antar-hearth
-
 services:
 
-  # streaming-service
-  streaming-service:
+  # ─────────────────────────────────────────
+  # REDIS — Streaming URL Cache
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:latest
+    container_name: redis-antar
+    volumes:
+      - redis-data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [hearth-internal]
+
+  # ─────────────────────────────────────────
+  # ZOOKEEPER — Required by Kafka
+  # ─────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks: [hearth-internal]
+
+  # ─────────────────────────────────────────
+  # KAFKA — Event Streaming
+  # ─────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks: [hearth-internal]
+
+  # ─────────────────────────────────────────
+  # POSTGRES — auth-service identity store
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: postgres-antar
     build:
       context: .
-      dockerfile: streaming-service/Dockerfile
-    container_name: streaming-service
-    env_file:
-      - ./streaming-service/.env
+      dockerfile: ./Dockerfile
     environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD}
+      POLICY_DB_PASSWORD: ${POLICY_DB_PASSWORD}
+      STREAMING_DB_PASSWORD: ${STREAMING_DB_PASSWORD}
+      CAMERA_DB_PASSWORD: ${CAMERA_DB_PASSWORD}
+      HEARTH_OWNER_USERNAME: ${HEARTH_OWNER_USERNAME}
+      HEARTH_OWNER_PASSWORD: ${HEARTH_OWNER_PASSWORD}
+      VIDEO_SVC_SECRET: ${VIDEO_SVC_SECRET}
+      ENCODING_SVC_SECRET: ${ENCODING_SVC_SECRET}
+      STREAMING_SVC_SECRET: ${STREAMING_SVC_SECRET}
+      GATEWAY_SVC_SECRET: ${GATEWAY_SVC_SECRET}
+      NOTIFICATION_SVC_SECRET: ${NOTIFICATION_SVC_SECRET}
+      CAMERA_SVC_SECRET: ${CAMERA_SVC_SECRET}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [hearth-internal]
+
+  # ─────────────────────────────────────────
+  # MOSQUITTO
+  # ─────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    volumes:
+      - ./camera-orchestrator/mosquitto/config:/mosquitto/config
+      - ./camera-orchestrator/mosquitto/data:/mosquitto/data
+      - ./camera-orchestrator/mosquitto/log:/mosquitto/log
     ports:
-      - "8084:8084"
+      - "1883:1883"
+      - "9100:9100"
+    networks: [hearth-internal]
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # GO2RTC
+  # ─────────────────────────────────────────
+  go2rtc:
+    image: alexxit/go2rtc:latest
+    container_name: go2rtc
+    env_file:
+      - ./camera-orchestrator/.env
+    volumes:
+      - ./camera-orchestrator/go2rtc.yaml:/config/go2rtc.yaml
+    ports:
+      - "1984:1984"
+      - "8554:8554"
+      - "8555:8555/tcp"
+      - "8555:8555/udp"
+    networks: [hearth-internal, nas-data]
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # MICROSERVICES
+  # ─────────────────────────────────────────
+
+  # api-gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    env_file:
+      - ./api-gateway/.env
+    ports:
+      - "8443:8443"
+      - "8081:8081"
+    volumes:
+      - ./secrets/gateway-keys:/run/secrets/gateway-keys:ro
     depends_on:
       auth-service:
         condition: service_started
-    networks:
-      - hearth
+      policy-registry:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [hearth-internal, hearth-edge]
 
   # auth-service
   auth-service:
@@ -28,13 +154,116 @@ services:
     container_name: auth-service
     env_file:
       - ./auth-service/.env
-    environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
+    volumes:
+      - ./secrets/auth-keys:/run/secrets/auth-keys:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [hearth-internal]
+
+  # policy-registry
+  policy-registry:
+    build:
+      context: .
+      dockerfile: policy-registry/Dockerfile
+    container_name: policy-registry
+    env_file:
+      - ./policy-registry/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks: [hearth-internal]
+
+  # nas-orchestrator
+  nas-orchestrator:
+    build:
+      context: .
+      dockerfile: nas-orchestrator/Dockerfile
+    container_name: nas-orchestrator
+    env_file:
+      - ./nas-orchestrator/.env
     ports:
-      - "8085:8085"
-      - "4091:4091"
-    networks:
-      - hearth
+      - "9002:9002"
+    depends_on:
+      redis:
+        condition: service_healthy
+      api-gateway:
+        condition: service_started
+    networks: [hearth-internal, nas-data]
+
+  # element-registry
+  element-registry:
+    build:
+      context: .
+      dockerfile: element-registry/Dockerfile
+    container_name: element-registry
+    env_file:
+      - ./element-registry/.env
+    depends_on:
+      auth-service:
+        condition: service_started
+    networks: [hearth-internal]
+
+  # video-service
+  video-service:
+    build:
+      context: .
+      dockerfile: video-service/Dockerfile
+    container_name: video-service
+    env_file:
+      - ./video-service/.env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      nas-orchestrator:
+        condition: service_started
+    networks: [hearth-internal]
+
+  # encoding-service
+  encoding-service:
+    build:
+      context: .
+      dockerfile: encoding-service/Dockerfile
+    container_name: encoding-service
+    env_file:
+      - ./encoding-service/.env
+    depends_on:
+      kafka:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      nas-orchestrator:
+        condition: service_started
+    networks: [hearth-internal]
+
+  # streaming-service
+  streaming-service:
+    build:
+      context: .
+      dockerfile: streaming-service/Dockerfile
+    container_name: streaming-service
+    env_file:
+      - ./streaming-service/.env
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      nas-orchestrator:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks: [hearth-internal]
 
   # notification-service
   notification-service:
@@ -44,17 +273,42 @@ services:
     container_name: notification-service
     env_file:
       - ./notification-service/.env
-    environment:
-      INFRA_HOST: ${INFRA_HOST:?set INFRA_HOST in .env}
-    ports:
-      - "8087:8087"
     depends_on:
+      kafka:
+        condition: service_healthy
       auth-service:
         condition: service_started
-    networks:
-      - hearth
+    networks: [hearth-internal]
+
+  # camera-orchestrator
+  camera-orchestrator:
+    build:
+      context: .
+      dockerfile: camera-orchestrator/Dockerfile
+    container_name: camera-orchestrator
+    env_file:
+      - ./camera-orchestrator/.env
+    ports:
+      - "9008:9008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+      go2rtc:
+        condition: service_started
+    networks: [hearth-internal, nas-data]
+    restart: unless-stopped
 
 networks:
-  hearth:
-    name: hearth
+  hearth-internal:
     driver: bridge
+    internal: true # no route off the host — service mesh only
+  hearth-edge:
+    driver: bridge # api-gateway public face
+  nas-data:
+    driver: bridge # nas-orchestrator ↔ NAS storage fabric (has egress)
+
+volumes:
+  redis-data:
+  postgres-data:

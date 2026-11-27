@@ -1,0 +1,32 @@
+# ============================================================
+# go2rtc configuration TEMPLATE
+# Container: go2rtc (accessible as http://go2rtc:1984 on hearth-internal)
+# Copy this to go2rtc.yaml and set your real values in .env
+# !! go2rtc.yaml is gitignored — NEVER commit it !!
+# ============================================================
+log:
+  level: info
+
+api:
+  listen: ":1984"
+
+webrtc:
+  listen: ":8555"
+  candidates:
+    - 127.0.0.1:8555
+    - 192.168.X.X:8555
+    - stun:8555
+
+streams:
+  front_porch:
+    - rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel0#backchannel=0#transport=tcp#timeout=30
+    - ffmpeg:rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel0#video=copy#audio=aac
+  front_porch_sub:
+    - rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel1#backchannel=0#transport=tcp#timeout=30
+    - ffmpeg:rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel1#video=copy#audio=aac
+  camera.front_porch_cam:
+    - rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel0#backchannel=0#transport=tcp#timeout=30
+    - ffmpeg:rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel0#video=copy#audio=aac
+  camera.front_porch_cam_sub:
+    - rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel1#backchannel=0#transport=tcp#timeout=30
+    - ffmpeg:rtsp://${RTSP_USERNAME}:${RTSP_PASSWORD}@${RTSP_IP}:${RTSP_PORT}/live/channel1#video=copy#audio=aac
