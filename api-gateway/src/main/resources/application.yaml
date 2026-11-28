@@ -371,6 +371,21 @@ spring:
                   resourceId: "{username}"
                   namespace: OWN
 
+            - id: nas-workspace-info
+              uri: http://nas-orchestrator:9002
+              predicates: [Path=/api/v1/nas/workspace/info, Method=GET]
+              filters:
+                - RewritePath=/api/v1/nas/(?<seg>.*), /api/v1/nas-orchestrator/${seg}
+              metadata:
+                hearth:
+                  intent: nas.workspace.read
+                  action: READ
+                  domain: NAS
+                  audience: nas-orchestrator
+                  resourceType: WORKSPACE
+                  resourceId: "{username}"
+                  namespace: OWN
+
             # ── HLS streaming (/api/v1/nas/stream/…) ────────────────────────────
             # Media player clients (Video.js, hls.js, native Safari) fetch playlists
             # and .ts segments using query param URLs (?token=...), not Authorization headers.

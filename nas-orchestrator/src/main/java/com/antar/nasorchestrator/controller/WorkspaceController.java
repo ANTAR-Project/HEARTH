@@ -3,6 +3,7 @@ package com.antar.nasorchestrator.controller;
 import com.antar.hearth.common.ScopeEnforcer;
 import com.antar.nasorchestrator.dto.CreateWorkspaceRequest;
 import com.antar.nasorchestrator.dto.CreateWorkspaceResponse;
+import com.antar.nasorchestrator.dto.WorkspaceInfoResponse;
 import com.antar.nasorchestrator.hearth.HearthPrincipal;
 import com.antar.nasorchestrator.service.WorkspaceService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,6 +54,14 @@ public class WorkspaceController {
         HearthPrincipal p = principal(request);
         workspaceService.clearWorkspace(p.resourceId());
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/info")
+    public ResponseEntity<WorkspaceInfoResponse> info(HttpServletRequest request) throws IOException {
+        HearthPrincipal p = principal(request);
+
+        WorkspaceInfoResponse response = workspaceService.getWorkspaceInfo(p.resourceId());
+        return ResponseEntity.ok(response);
     }
 }
 

@@ -2,6 +2,7 @@ package com.antar.nasorchestrator.service;
 
 import com.antar.nasorchestrator.client.SmbFileClient;
 import com.antar.nasorchestrator.dto.CreateWorkspaceResponse;
+import com.antar.nasorchestrator.dto.WorkspaceInfoResponse;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -33,5 +34,13 @@ public class WorkspaceService {
         }
 
         smbFileClient.clearWorkspaceContents(name);
+    }
+
+    public WorkspaceInfoResponse getWorkspaceInfo(String name) throws IOException {
+        if (name.equals("shared")) {
+            throw new IllegalArgumentException("Cannot get info for shared workspace by this function");
+        }
+
+        return smbFileClient.getWorkspaceInfo(name);
     }
 }

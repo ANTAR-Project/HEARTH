@@ -1,6 +1,7 @@
 package com.antar.nasorchestrator.client;
 
 import com.antar.nasorchestrator.dto.FileEntry;
+import com.antar.nasorchestrator.dto.WorkspaceInfoResponse;
 import com.antar.nasorchestrator.exception.FolderAlreadyExistsException;
 import com.antar.nasorchestrator.exception.WorkspaceAlreadyExistsException;
 import jakarta.servlet.http.HttpServletResponse;
@@ -316,6 +317,48 @@ public class SmbFileClient {
             }
 
             deleteRecursively(workspaceDir);
+        }
+    }
+
+    public WorkspaceInfoResponse getWorkspaceInfo(String name) throws IOException {
+        try (SmbFile workspaceDir = resolve(name.endsWith("/") ? name : name + "/")) {
+            if (!workspaceDir.exists()) {
+                throw new FileNotFoundException("Workspace does not exist: " + name);
+            }
+
+            long[] totals = new long[2]; // [0] = fileCount, [1] = totalSize
+            collectWorkspaceStats(workspaceDir, totals);
+            return new WorkspaceInfoResponse(totals[0], totals[1]);
+        }
+    }
+
+    private void collectWorkspaceStats(SmbFile dir, long[] totals) throws IOException {
+        String path = dir.getPath();
+        boolean createdNewDir = !path.endsWith("/");
+        SmbFile listableDir = createdNewDir ? new SmbFile(path + "/", cifsContext) : dir;
+
+        try {
+            SmbFile[] children = listableDir.listFiles();
+            if (children != null) {
+                for (SmbFile child : children) {
+                    try (child) {
+                        if (child.isDirectory()) {
+                            String dirName = child.getName().replaceAll("/$", "");
+                            if (dirName.equalsIgnoreCase("encoded")) {
+                                continue;
+                            }
+                            collectWorkspaceStats(child, totals);
+                        } else {
+                            totals[0]++;
+                            totals[1] += child.length();
+                        }
+                    }
+                }
+            }
+        } finally {
+            if (createdNewDir) {
+                listableDir.close();
+            }
         }
     }
 
